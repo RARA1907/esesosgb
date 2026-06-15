@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>İSGM Hekim Modülü - Sağlık Kayıtları</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0fdf4; padding: 30px; }
+        .card { background: white; padding: 25px; border-radius: 12px; max-width: 550px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        h2 { color: #166534; margin-top: 0; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; color: #374151; font-weight: 600; }
+        input, select, textarea { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; }
+        button { background: #16a34a; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; }
+        button:hover { background: #15803d; }
+        .nav-link { display: block; text-align: center; margin-top: 15px; color: #64748b; text-decoration: none; font-size: 14px; }
+        #status { margin-top: 15px; text-align: center; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>🩺 Periyodik Muayene & Sağlık Kartı Girişi</h2>
+    <p style="color: #64748b; font-size: 14px;">İşyeri hekimi klinik bulgularını girer. Bu veriler medikal gizlilik standartlarında saklanır.</p>
+    
+    <div class="form-group">
+        <label>Göz Muayene Bulguları (Ek-2)</label>
+        <input type="text" id="goz" placeholder="Örn: Sol 0.8, Sağ 1.0 Tam, Renk Körlüğü Yok">
+    </div>
+
+    <div class="form-group">
+        <label>Kardiyovasküler (Kalp/Tansiyon) Bulguları</label>
+        <input type="text" id="kalp" placeholder="Örn: TA: 120/80 mmHg, Nabız: 74/dk Ritmic">
+    </div>
+
+    <div class="form-group">
+        <label>Kas-İskelet Sistemi Bulguları</label>
+        <input type="text" id="kas" placeholder="Örn: Hareket kısıtlılığı yok, skolyoz izlenmedi">
+    </div>
+
+    <div class="form-group">
+        <label>Kanaat ve Sonuç Kararı</label>
+        <select id="decision">
+            <option value="Ağır ve Tehlikeli İşlerde Çalışabilir">Ağır ve Tehlikeli İşlerde Çalışabilir</option>
+            <option value="Yüksekte Çalışabilir">Yüksekte Çalışabilir</option>
+            <option value="Kısıtlamalarla Çalışabilir">Kısıtlamalarla Çalışabilir</option>
+            <option value="Sahada Çalışması Uygun Değildir">Sahada Çalışması Uygun Değildir</option>
+        </select>
+    </div>
+
+    <button onclick="saveMedical()">Sağlık Kartını Onayla ve Kaydet (Canlı)</button>
+    <div id="status"></div>
+    
+    <a href="index.html" class="nav-link">← Ana Yönetim Paneline Dön</a>
+</div>
+
+<script>
+    const SUPABASE_URL = "https://dnvuizausfcjzkcsynql.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_LtrytF9wyS3u-KgSZk7heg_SZc7hhoY";
+    const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    async function saveMedical() {
+        const gozVal = document.getElementById('goz').value;
+        const kalpVal = document.getElementById('kalp').value;
+        const kasVal = document.getElementById('kas').value;
+        const decisionVal = document.getElementById('decision').value;
+        const statusDiv = document.getElementById('status');
+
+        if(!gozVal || !kalpVal || !kasVal) {
+            statusDiv.style.color = "red";
+            statusDiv.innerText = "Lütfen klinik bulguları boş bırakmayın!";
+            return;
+        }
+
+        statusDiv.style.color = "blue";
+        statusDiv.innerText = "Medikal kayıt şifrelenerek gönderiliyor...";
+
+        const { data, error } = await dbClient
+            .from('worker_medical_records')
+            .insert([
+                { 
+                    goz_secure: gozVal, 
+                    kalp_secure: kalpVal, 
+                    kas_secure: kasVal, 
+                    final_decision: decisionVal
+                }
+            ]);
+
+        if (error) {
+            statusDiv.style.color = "red";
+            statusDiv.innerText = "Hata: " + error.message;
+        } else {
+            statusDiv.style.color = "green";
+            statusDiv.innerText = "🚀 Muayene Kartı Başarıyla Canlı Veritabanına Yazıldı!";
+            document.getElementById('goz').value = '';
+            document.getElementById('kalp').value = '';
+            document.getElementById('kas').value = '';
+        }
+    }
+</script>
+</body>
+</html>

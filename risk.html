@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>İSG Uzman Modülü - Risk Değerlendirmesi</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f1f5f9; padding: 30px; }
+        .card { background: white; padding: 25px; border-radius: 12px; max-width: 550px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        h2 { color: #0f172a; margin-top: 0; display: flex; align-items: center; gap: 10px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; color: #475569; font-weight: 600; }
+        input, select, textarea { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .score-box { background: #f8fafc; border: 2px dashed #e2e8f0; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 15px; }
+        .score-value { font-size: 24px; font-weight: bold; color: #0f172a; }
+        button { background: #0284c7; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; }
+        button:hover { background: #0369a1; }
+        .nav-link { display: block; text-align: center; margin-top: 15px; color: #64748b; text-decoration: none; font-size: 14px; }
+        #status { margin-top: 15px; text-align: center; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>🦺 Fine-Kinney Risk Analiz Motoru</h2>
+    <p style="color: #64748b; font-size: 14px;">Sahada tespit edilen tehlikeyi ve parametreleri girin. Skor otomatik hesaplanır.</p>
+    
+    <div class="form-group">
+        <label>Tehlike Tanımı / Bulgusu</label>
+        <textarea id="hazard_title" rows="2" placeholder="Örn: Yüksekte çalışma alanında yaşam hattının bulunmaması..."></textarea>
+    </div>
+
+    <div class="grid-3">
+        <div class="form-group">
+            <label>Olasılık (O)</label>
+            <select id="prob" onchange="calculateFineKinney()">
+                <option value="0.1">0.1 - Zayıf İhtimal</option>
+                <option value="1">1 - Oldukça Düşük</option>
+                <option value="3">3 - Nadir Fakat Mümkün</option>
+                <option value="6">6 - Kuvvetle Muhtemel</option>
+                <option value="10">10 - Beklenir/Kaçınılmaz</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Frekans (F)</label>
+            <select id="freq" onchange="calculateFineKinney()">
+                <option value="0.5">0.5 - Çok Nadir</option>
+                <option value="1">1 - Yılda Birkaç Kez</option>
+                <option value="2">2 - Ayda Birkez</option>
+                <option value="6">6 - Günlük</option>
+                <option value="10">10 - Sürekli</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Şiddet (Ş)</label>
+            <select id="sev" onchange="calculateFineKinney()">
+                <option value="1">1 - Dikkat Edilmeli</option>
+                <option value="3">3 - Hafif Yaralanma</option>
+                <option value="7">7 - Ciddi Yaralanma</option>
+                <option value="15">15 - Ölümcül/Kayıp</option>
+                <option value="40">40 - Afet/Çoklu Ölüm</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="score-box">
+        <div>Hesaplanan Risk Skoru (R)</div>
+        <div class="score-value" id="risk_score_display">0.5</div>
+        <div id="risk_level_display" style="font-size: 14px; font-weight: 600; margin-top: 5px;">Düşük Risk</div>
+    </div>
+
+    <div class="form-group">
+        <label>Termin Tarihi (Hedef Çözüm)</label>
+        <input type="date" id="target_date">
+    </div>
+
+    <button onclick="saveRisk()">Risk Analizini Kaydet (Canlı)</button>
+    <div id="status"></div>
+    
+    <a href="index.html" class="nav-link">← Ana Yönetim Paneline Dön</a>
+</div>
+
+<script>
+    const SUPABASE_URL = "https://dnvuizausfcjzkcsynql.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_LtrytF9wyS3u-KgSZk7heg_SZc7hhoY";
+    const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    function calculateFineKinney() {
+        const o = parseFloat(document.getElementById('prob').value);
+        const f = parseFloat(document.getElementById('freq').value);
+        const s = parseFloat(document.getElementById('sev').value);
+        const score = o * f * s;
+        
+        document.getElementById('risk_score_display').innerText = score.toFixed(1);
+        
+        const lvl = document.getElementById('risk_level_display');
+        if(score < 20) { lvl.innerText = "Düşük Risk"; lvl.style.color = "green"; }
+        else if(score < 70) { lvl.innerText = "Olası Risk (İzlenmeli)"; lvl.style.color = "orange"; }
+        else if(score < 200) { lvl.innerText = "Önemli Risk (Önlem Al)"; lvl.style.color = "darkorange"; }
+        else { lvl.innerText = "ESASLI RİSK (İŞİ DURDUR)"; lvl.style.color = "red"; }
+    }
+
+    async function saveRisk() {
+        const hazard = document.getElementById('hazard_title').value;
+        const o = parseFloat(document.getElementById('prob').value);
+        const f = parseFloat(document.getElementById('freq').value);
+        const s = parseFloat(document.getElementById('sev').value);
+        const score = o * f * s;
+        const target = document.getElementById('target_date').value;
+        const statusDiv = document.getElementById('status');
+
+        if(!hazard || !target) {
+            statusDiv.style.color = "red";
+            statusDiv.innerText = "Lütfen tüm alanları doldurun!";
+            return;
+        }
+
+        statusDiv.style.color = "blue";
+        statusDiv.innerText = "Risk raporu buluta yazılıyor...";
+
+        const { data, error } = await dbClient
+            .from('risk_assessments')
+            .insert([
+                { 
+                    hazard_title: hazard, 
+                    probability_o: o, 
+                    frequency_f: f, 
+                    severity_s: s, 
+                    risk_score: score, 
+                    target_date: target,
+                    status: 'Açık'
+                }
+            ]);
+
+        if (error) {
+            statusDiv.style.color = "red";
+            statusDiv.innerText = "Hata: " + error.message;
+        } else {
+            statusDiv.style.color = "green";
+            statusDiv.innerText = "🚀 Risk Raporu Başarıyla Veritabanına Eklendi!";
+            document.getElementById('hazard_title').value = '';
+            document.getElementById('target_date').value = '';
+        }
+    }
+    
+    // İlk açılışta bir kere hesaplasın
+    calculateFineKinney();
+</script>
+</body>
+</html>
