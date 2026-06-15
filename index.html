@@ -78,7 +78,7 @@
         statusDiv.innerText = "Buluta gönderiliyor...";
 
         try {
-            const { data, error } = await supabase
+            const { data, error } = await dbClient
                 .from('customer_companies')
                 .insert([
                     { company_name: name, tax_number: tax, nace_code: nace, danger_class: danger }
