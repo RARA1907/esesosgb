@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSGB SaaS - Canlı Test Paneli</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.4/dist/umd/supabase.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f9; padding: 30px; }
+        .card { background: white; padding: 25px; border-radius: 12px; max-width: 500px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        h2 { color: #1e293b; margin-top: 0; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; color: #64748b; font-weight: 600; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; }
+        button { background: #10b981; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; }
+        button:hover { background: #059669; }
+        #status { margin-top: 15px; text-align: center; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>🏢 Canlı Firma Ekleme Testi</h2>
+    <p style="color: #64748b; font-size: 14px;">Bu formdan girilen veriler anında Frankfurt'taki Supabase veritabanınıza yazılacaktır.</p>
+    
+    <div class="form-group">
+        <label>Firma Adı</label>
+        <input type="text" id="comp_name" placeholder="Örn: Vardar İnşaat A.Ş.">
+    </div>
+    <div class="form-group">
+        <label>Vergi Numarası (11 Haneli)</label>
+        <input type="text" id="tax_no" placeholder="Örn: 12345678901">
+    </div>
+    <div class="form-group">
+        <label>NACE Kodu</label>
+        <input type="text" id="nace" placeholder="Örn: 41.20.02">
+    </div>
+    <div class="form-group">
+        <label>Tehlike Sınıfı</label>
+        <select id="danger">
+            <option value="Az Tehlikeli">Az Tehlikeli</option>
+            <option value="Tehlikeli">Tehlikeli</option>
+            <option value="Çok Tehlikeli">Çok Tehlikeli</option>
+        </select>
+    </div>
+    <button onclick="saveToSupabase()">Veritabanına Gönder (Canlı)</button>
+    <div id="status"></div>
+</div>
+
+<script>
+    const SUPABASE_URL = "https://dnvuizausfcjzkcsynql.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_LtrytF9wyS3u-KgSZk7heg_SZc7hhoY";
+    
+    // Doğrudan global objeden güvenli başlatma yapıyoruz
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+        auth: { persistSession: false } // Tarayıcı çerez çakışmalarını ve CORS bloklarını esnetir
+    });
+
+    async function saveToSupabase() {
+        const name = document.getElementById('comp_name').value;
+        const tax = document.getElementById('tax_no').value;
+        const nace = document.getElementById('nace').value;
+        const danger = document.getElementById('danger').value;
+        const statusDiv = document.getElementById('status');
+
+        if(!name || !tax || !nace) {
+            statusDiv.style.color = "red";
+            statusDiv.innerText = "Lütfen boş alan bırakmayın!";
+            return;
+        }
+
+        statusDiv.style.color = "blue";
+        statusDiv.innerText = "Buluta gönderiliyor...";
+
+        try {
+            const { data, error } = await supabase
+                .from('customer_companies')
+                .insert([
+                    { company_name: name, tax_number: tax, nace_code: nace, danger_class: danger }
+                ])
+                .select(); // Yeni mimaride geriye veri dönülmesini zorunlu tutarak isteği tetikliyoruz
+
+            if (error) {
+                statusDiv.style.color = "red";
+                statusDiv.innerText = "Hata: " + error.message;
+                console.error(error);
+            } else {
+                statusDiv.style.color = "green";
+                statusDiv.innerText = "🚀 Başarılı! Veri Supabase'e tık diye yazıldı.";
+                document.getElementById('comp_name').value = '';
+                document.getElementById('tax_no').value = '';
+                document.getElementById('nace').value = '';
+            }
+        } catch (err) {
+            statusDiv.style.color = "red";
+            statusDiv.innerText = "Bağlantı Hatası: " + err.message;
+        }
+    }
+</script>
+</body>
+</html>
