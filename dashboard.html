@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OSGB SaaS - Dashboard</title>
+    <title>OSGB SaaS - DÖF Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -18,58 +18,76 @@
             --nav-inactive-text: #475569;
         }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-main); color: var(--text-main); padding: 30px; display: none; }
-        .card { background: var(--bg-card); padding: 25px; border-radius: 12px; max-width: 1050px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid var(--border-color); }
-        
-        /* 🏛️ GLOBAL STANDART ÜST BAR STİLLERİ */
+        .card { background: var(--bg-card); padding: 25px; border-radius: 12px; max-width: 1120px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid var(--border-color); }
         .global-header { border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px; }
         .top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        
-        /* Sol Üst Köşe - OSGB Logo Alanı */
         .logo-area { font-size: 18px; font-weight: 800; color: var(--text-main); letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
         .logo-badge { background: var(--primary); color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; }
-        
-        /* Sağ Üst Köşe - Kontroller Grubu */
         .controls-group { display: flex; align-items: center; gap: 20px; }
         .theme-selector-container { display: flex; gap: 6px; align-items: center; background: var(--table-header); padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border-color); }
         .theme-btn { width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .user-info { font-size: 13px; color: var(--text-muted); font-weight: 600; }
         .logout-btn { background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; }
-        
-        /* Sabit Sekme Menüsü Container */
-        .nav-container { display: flex; gap: 8px; justify-content: center; background: var(--table-header); padding: 6px; border-radius: 10px; border: 1px solid var(--border-color); }
+        .nav-container { display: flex; gap: 8px; justify-content: center; background: var(--table-header); padding: 6px; border-radius: 10px; border: 1px solid var(--border-color); flex-wrap: wrap; }
         .nav-btn { background: var(--nav-inactive-bg); color: var(--nav-inactive-text); padding: 10px 18px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 13px; transition: all 0.2s ease; }
         .nav-btn:hover { background: var(--border-color); color: var(--text-main); }
         .nav-btn.active-page { background: var(--primary); color: white !important; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
 
-        /* 📊 DASHBOARD METRİKLERİ */
-        .distribution-title { font-size: 14px; font-weight: bold; color: var(--text-muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px;}
-        .dashboard-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px; }
-        .metric-box { padding: 15px 20px; border-radius: 10px; color: white; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .section-title { font-size: 14px; font-weight: bold; color: var(--text-muted); margin: 22px 0 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .dashboard-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 18px; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 18px; }
+        .metric-box { padding: 15px 18px; border-radius: 10px; color: white; box-shadow: 0 4px 10px rgba(0,0,0,0.05); min-height: 76px; cursor: default; }
+        .metric-box.clickable { cursor: pointer; }
+        .metric-title { font-size: 12px; font-weight: 700; opacity: 0.95; line-height: 1.25; }
+        .metric-value { font-size: 28px; font-weight: 800; margin-top: 5px; }
+        .metric-sub { font-size: 11px; opacity: 0.85; margin-top: 3px; }
         .metric-red { background: linear-gradient(135deg, #ef4444, #b91c1c); }
         .metric-orange { background: linear-gradient(135deg, #f97316, #c2410c); }
         .metric-green { background: linear-gradient(135deg, #10b981, #047857); }
-        .metric-title { font-size: 12px; font-weight: 600; opacity: 0.9; }
-        .metric-value { font-size: 26px; font-weight: bold; margin-top: 3px; }
+        .metric-blue { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
+        .metric-purple { background: linear-gradient(135deg, #8b5cf6, #6d28d9); }
+        .metric-slate { background: linear-gradient(135deg, #475569, #0f172a); }
+        .metric-cyan { background: linear-gradient(135deg, #06b6d4, #0e7490); }
+        .metric-amber { background: linear-gradient(135deg, #f59e0b, #b45309); }
 
-        /* 🚨 OPERASYONEL NABIZ */
-        .operational-banner { background: var(--text-main); color: var(--bg-card); padding: 15px 20px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border: 1px solid var(--border-color); }
-        .op-text h4 { margin: 0; font-size: 15px; }
-        .op-text p { margin: 3px 0 0 0; font-size: 12px; opacity: 0.8; }
-        .op-badge { background: #f97316; color: white; padding: 8px 16px; border-radius: 8px; font-size: 22px; font-weight: bold; }
+        .operational-banner { color: white; padding: 16px 20px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin: 20px 0 22px; border: 1px solid var(--border-color); cursor: pointer; }
+        .op-critical { background: linear-gradient(135deg, #991b1b, #ef4444); }
+        .op-warning { background: linear-gradient(135deg, #9a3412, #f97316); }
+        .op-good { background: linear-gradient(135deg, #065f46, #10b981); }
+        .op-text h4 { margin: 0; font-size: 16px; }
+        .op-text p { margin: 5px 0 0 0; font-size: 12px; opacity: 0.9; }
+        .op-badge { background: rgba(255,255,255,0.18); color: white; padding: 8px 16px; border-radius: 8px; font-size: 24px; font-weight: bold; min-width: 44px; text-align: center; }
+
+        .content-grid { display: grid; grid-template-columns: 1.25fr 0.75fr; gap: 18px; margin-top: 18px; }
+        .panel { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 18px; }
+        .panel h3 { margin: 0; padding-bottom: 8px; border-bottom: 2px solid var(--primary); font-size: 16px; }
+        .panel p { color: var(--text-muted); font-size: 12px; margin: 8px 0 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 12px; }
+        th, td { padding: 9px; text-align: left; border-bottom: 1px solid var(--border-color); vertical-align: top; }
+        th { background-color: var(--table-header); color: var(--text-muted); font-weight: 700; }
+        .badge { padding: 3px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; display: inline-block; white-space: nowrap; }
+        .badge-red { background:#fee2e2; color:#b91c1c; }
+        .badge-orange { background:#ffedd5; color:#c2410c; }
+        .badge-green { background:#dcfce7; color:#15803d; }
+        .badge-blue { background:#dbeafe; color:#1d4ed8; }
+        .small-link { color: var(--primary); font-weight: 700; text-decoration: none; }
+        .small-link:hover { text-decoration: underline; }
+        .empty-state { text-align:center; color:var(--text-muted); padding:18px; }
+
+        @media (max-width: 900px) {
+            body { padding: 14px; }
+            .top-row, .controls-group, .operational-banner { flex-direction: column; align-items: stretch; gap: 10px; }
+            .dashboard-grid, .kpi-grid, .content-grid { grid-template-columns: 1fr; }
+            .nav-btn { text-align: center; }
+        }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <!-- 🏛️ YENİ GLOBAL STANDART ÜST BAR (HER SAYFADA MİLMETRİK AYNI KALACAK) -->
     <div class="global-header">
         <div class="top-row">
-            <!-- Sol Üst: Sabit Logo Alanı -->
-            <div class="logo-area">
-                🏢 <span id="lbl_osgb_title">AKAD OSGB</span> <span class="logo-badge">SaaS</span>
-            </div>
-            
-            <!-- Sağ Üst: Temiz Kontrol Havuzu -->
+            <div class="logo-area">🏢 <span id="lbl_osgb_title">AKAD OSGB</span> <span class="logo-badge">SaaS</span></div>
             <div class="controls-group">
                 <div class="theme-selector-container">
                     <span style="font-size: 11px; font-weight: bold; color: var(--text-muted); margin-right: 2px;">🎨 TEMA:</span>
@@ -84,7 +102,6 @@
             </div>
         </div>
 
-        <!-- Sabit Sekme Butonları (Ana Sayfa Aktif) -->
         <div class="nav-container">
             <a href="dashboard.html" class="nav-btn active-page">🏠 Ana Sayfa</a>
             <a href="index.html" class="nav-btn">🏢 Firma Yönetimi</a>
@@ -96,25 +113,66 @@
         </div>
     </div>
 
-    <!-- 📊 PORTFÖY ÖZET GÖSTERGELERİ -->
-    <div class="distribution-title">📋 Portföy Tehlike Dağılımı</div>
+    <div class="section-title">📋 Portföy Tehlike Dağılımı</div>
     <div class="dashboard-grid">
         <div class="metric-box metric-red"><div class="metric-title">Çok Tehlikeli Firma</div><div class="metric-value" id="stat_danger_cok">0</div></div>
         <div class="metric-box metric-orange"><div class="metric-title">Tehlikeli Firma</div><div class="metric-value" id="stat_danger_tehlike">0</div></div>
         <div class="metric-box metric-green"><div class="metric-title">Az Tehlikeli Firma</div><div class="metric-value" id="stat_danger_az">0</div></div>
     </div>
 
-    <!-- 🚨 OPERASYONEL NABIZ -->
-    <div class="operational-banner" style="cursor:pointer;" onclick="window.location.href='actions.html'">
-        <div class="op-text">
-            <h4>🚨 Sahadaki Aktif Risk ve Bulgular (Açık Uygunsuzluklar)</h4>
-            <p>OSGB uzmanları tarafından sahada tespit edilmiş, anlık olarak kapatılmayı bekleyen yasal bildirimler.</p>
-        </div>
-        <div class="op-badge" id="stat_total_risks">0</div>
+    <div class="section-title">🚨 DÖF Operasyon Özeti</div>
+    <div class="kpi-grid">
+        <div class="metric-box metric-red clickable" onclick="window.location.href='actions.html?filter=overdue'"><div class="metric-title">Geciken DÖF</div><div class="metric-value" id="stat_overdue_dofs">0</div><div class="metric-sub">Termin tarihi geçmiş aktif kayıt</div></div>
+        <div class="metric-box metric-orange clickable" onclick="window.location.href='actions.html?filter=open'"><div class="metric-title">Açık DÖF</div><div class="metric-value" id="stat_open_dofs">0</div><div class="metric-sub">Henüz kapatılmamış bulgu</div></div>
+        <div class="metric-box metric-blue clickable" onclick="window.location.href='actions.html?filter=progress'"><div class="metric-title">Devam Eden</div><div class="metric-value" id="stat_progress_dofs">0</div><div class="metric-sub">Aksiyona alınmış kayıt</div></div>
+        <div class="metric-box metric-green clickable" onclick="window.location.href='actions.html?filter=closed'"><div class="metric-title">Kapalı DÖF</div><div class="metric-value" id="stat_closed_dofs">0</div><div class="metric-sub">Tamamlanmış kayıt</div></div>
     </div>
-    
-    <div style="background: var(--table-header); border: 1px dashed var(--border-color); padding: 30px; border-radius: 8px; text-align: center; color: var(--text-muted); font-size: 14px; margin-top: 20px;">
-        💡 <strong>Grafikler & Performans Analizleri Yakında:</strong> Buraya uzmanların aylık saha ziyaret oranlarını gösteren kurumsal İSG barlarını ekleyeceğiz.
+
+    <div class="kpi-grid">
+        <div class="metric-box metric-purple"><div class="metric-title">Toplam Firma</div><div class="metric-value" id="stat_total_companies">0</div><div class="metric-sub">Müşteri portföyü</div></div>
+        <div class="metric-box metric-slate"><div class="metric-title">Toplam Çalışan</div><div class="metric-value" id="stat_total_workers">0</div><div class="metric-sub">Kayıtlı çalışan sayısı</div></div>
+        <div class="metric-box metric-cyan"><div class="metric-title">Fotoğraflı DÖF</div><div class="metric-value" id="stat_photo_dofs">0</div><div class="metric-sub">Kanıt fotoğrafı olan kayıt</div></div>
+        <div class="metric-box metric-amber"><div class="metric-title">Bu Ay Ziyaret</div><div class="metric-value" id="stat_month_visits">0</div><div class="metric-sub">Planlanan saha ziyareti</div></div>
+    </div>
+
+    <div id="operational_banner" class="operational-banner op-good" onclick="window.location.href='actions.html'">
+        <div class="op-text">
+            <h4 id="op_title">✅ Operasyonel durum iyi</h4>
+            <p id="op_desc">Geciken kritik DÖF bulunmuyor. Detaylı takip için Aksiyon Havuzu'na geçebilirsiniz.</p>
+        </div>
+        <div class="op-badge" id="op_badge">0</div>
+    </div>
+
+    <div class="content-grid">
+        <div class="panel">
+            <h3>⏰ Öncelikli DÖF Takibi</h3>
+            <p>Geciken ve yaklaşan aktif kayıtlar. Tam liste için Aksiyon Havuzu'nu açın.</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Firma</th>
+                        <th>Bulgu / Sorumlu</th>
+                        <th>Termin</th>
+                        <th>Durum</th>
+                    </tr>
+                </thead>
+                <tbody id="priority_dofs_tbody"><tr><td colspan="4" class="empty-state">DÖF verileri yükleniyor...</td></tr></tbody>
+            </table>
+        </div>
+        <div class="panel">
+            <h3>📅 Bu Ay Saha Ziyaretleri</h3>
+            <p>Yaklaşan ziyaret planları.</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tarih</th>
+                        <th>Firma / Personel</th>
+                        <th>Süre</th>
+                    </tr>
+                </thead>
+                <tbody id="month_visits_tbody"><tr><td colspan="3" class="empty-state">Ziyaretler yükleniyor...</td></tr></tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -143,31 +201,167 @@
 
         const { data: { session } } = await dbClient.auth.getSession();
         if (!session) { window.location.href = "login.html"; return; }
-        
         document.body.style.display = "block";
         const email = session.user.email;
         document.getElementById('current_user_email').innerText = email;
-        
         if (email.includes('uzman') || email.includes('admin')) document.getElementById('menu_risk').style.display = 'inline-block';
         if (email.includes('hekim') || email.includes('admin')) document.getElementById('menu_medical').style.display = 'inline-block';
-        
         fetchDashboardStats();
     };
 
+    function todayString() {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+
+    function currentMonthRange() {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = d.getMonth();
+        const start = new Date(y, m, 1);
+        const end = new Date(y, m + 1, 1);
+        const fmt = (date) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+        return { start: fmt(start), end: fmt(end) };
+    }
+
+    function normalizeStatus(status) {
+        return status || 'Açık';
+    }
+
+    function isClosed(status) {
+        return normalizeStatus(status) === 'Kapalı';
+    }
+
+    function statusBadge(status) {
+        const st = normalizeStatus(status);
+        if (st === 'Kapalı') return '<span class="badge badge-green">Kapalı</span>';
+        if (st === 'Devam Ediyor') return '<span class="badge badge-blue">Devam Ediyor</span>';
+        return '<span class="badge badge-orange">Açık</span>';
+    }
+
+    function shortText(text, limit) {
+        if (!text) return '-';
+        return text.length > limit ? text.substring(0, limit) + '...' : text;
+    }
+
     async function fetchDashboardStats() {
         try {
-            const { data: companies } = await dbClient.from('customer_companies').select('danger_class');
-            if (companies) {
-                const cokCount = companies.filter(c => c.danger_class && c.danger_class.toString().trim().toLowerCase() === 'çok tehlikeli').length;
-                const tehlikeCount = companies.filter(c => c.danger_class && c.danger_class.toString().trim().toLowerCase() === 'tehlikeli').length;
-                const azCount = companies.filter(c => c.danger_class && c.danger_class.toString().trim().toLowerCase() === 'az tehlikeli').length;
-                document.getElementById('stat_danger_cok').innerText = cokCount;
-                document.getElementById('stat_danger_tehlike').innerText = tehlikeCount;
-                document.getElementById('stat_danger_az').innerText = azCount;
-            }
-            const { data: risks } = await dbClient.from('risk_assessments').select('id').eq('status', 'Açık');
-            if (risks) { document.getElementById('stat_total_risks').innerText = risks.length; }
-        } catch (err) { console.error(err.message); }
+            const today = todayString();
+            const { start, end } = currentMonthRange();
+
+            const [companiesRes, workersRes, risksRes, visitsRes] = await Promise.all([
+                dbClient.from('customer_companies').select('id, danger_class'),
+                dbClient.from('workers').select('id', { count: 'exact', head: true }),
+                dbClient.from('risk_assessments').select('id, status, target_date, image_url, image_path, hazard_title, action_plan, responsible_person, risk_score, customer_companies(company_name)').order('target_date', { ascending: true }),
+                dbClient.from('field_schedules').select('id, visit_date, assigned_staff, planned_minutes, customer_companies(company_name)').gte('visit_date', start).lt('visit_date', end).order('visit_date', { ascending: true })
+            ]);
+
+            const companies = companiesRes.data || [];
+            const risks = risksRes.data || [];
+            const visits = visitsRes.data || [];
+
+            const cokCount = companies.filter(c => (c.danger_class || '').toString().trim().toLowerCase() === 'çok tehlikeli').length;
+            const tehlikeCount = companies.filter(c => (c.danger_class || '').toString().trim().toLowerCase() === 'tehlikeli').length;
+            const azCount = companies.filter(c => (c.danger_class || '').toString().trim().toLowerCase() === 'az tehlikeli').length;
+
+            const openDofs = risks.filter(r => normalizeStatus(r.status) === 'Açık').length;
+            const progressDofs = risks.filter(r => normalizeStatus(r.status) === 'Devam Ediyor').length;
+            const closedDofs = risks.filter(r => normalizeStatus(r.status) === 'Kapalı').length;
+            const activeRisks = risks.filter(r => !isClosed(r.status));
+            const overdueDofs = activeRisks.filter(r => r.target_date && r.target_date < today).length;
+            const photoDofs = risks.filter(r => r.image_url || r.image_path).length;
+
+            document.getElementById('stat_danger_cok').innerText = cokCount;
+            document.getElementById('stat_danger_tehlike').innerText = tehlikeCount;
+            document.getElementById('stat_danger_az').innerText = azCount;
+            document.getElementById('stat_total_companies').innerText = companies.length;
+            document.getElementById('stat_total_workers').innerText = workersRes.count || 0;
+            document.getElementById('stat_open_dofs').innerText = openDofs;
+            document.getElementById('stat_progress_dofs').innerText = progressDofs;
+            document.getElementById('stat_closed_dofs').innerText = closedDofs;
+            document.getElementById('stat_overdue_dofs').innerText = overdueDofs;
+            document.getElementById('stat_photo_dofs').innerText = photoDofs;
+            document.getElementById('stat_month_visits').innerText = visits.length;
+
+            updateOperationalBanner(overdueDofs, openDofs, progressDofs);
+            renderPriorityDofs(activeRisks, today);
+            renderMonthVisits(visits, today);
+        } catch (err) {
+            console.error(err.message);
+            document.getElementById('priority_dofs_tbody').innerHTML = `<tr><td colspan="4" class="empty-state" style="color:#b91c1c;">Dashboard verileri yüklenemedi: ${err.message}</td></tr>`;
+        }
+    }
+
+    function updateOperationalBanner(overdue, open, progress) {
+        const banner = document.getElementById('operational_banner');
+        const title = document.getElementById('op_title');
+        const desc = document.getElementById('op_desc');
+        const badge = document.getElementById('op_badge');
+        banner.classList.remove('op-critical', 'op-warning', 'op-good');
+        if (overdue > 0) {
+            banner.classList.add('op-critical');
+            title.innerText = '🚨 Geciken DÖF var';
+            desc.innerText = 'Termin tarihi geçmiş aktif kayıtlar öncelikli aksiyon bekliyor. Detay için Aksiyon Havuzu\'na geçin.';
+            badge.innerText = overdue;
+        } else if ((open + progress) > 0) {
+            banner.classList.add('op-warning');
+            title.innerText = '⚠️ Aktif DÖF takibi sürüyor';
+            desc.innerText = 'Geciken kayıt yok; ancak açık veya devam eden DÖF kayıtları takip edilmeli.';
+            badge.innerText = open + progress;
+        } else {
+            banner.classList.add('op-good');
+            title.innerText = '✅ Operasyonel durum iyi';
+            desc.innerText = 'Geciken veya aktif DÖF bulunmuyor. Yeni saha bulguları için Risk Motoru kullanılabilir.';
+            badge.innerText = '0';
+        }
+    }
+
+    function renderPriorityDofs(activeRisks, today) {
+        const tbody = document.getElementById('priority_dofs_tbody');
+        const list = activeRisks
+            .slice()
+            .sort((a, b) => (a.target_date || '9999-12-31').localeCompare(b.target_date || '9999-12-31'))
+            .slice(0, 6);
+        if (list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Aktif DÖF bulunmuyor.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = '';
+        list.forEach(r => {
+            const compName = r.customer_companies ? r.customer_companies.company_name : 'Bilinmeyen Firma';
+            const overdue = r.target_date && r.target_date < today;
+            const terminHtml = overdue ? `<span class="badge badge-red">Gecikti</span><br>${r.target_date}` : `<span class="badge badge-green">Takipte</span><br>${r.target_date || '-'}`;
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${compName}</strong><br><small style="color:var(--text-muted);">Skor: ${r.risk_score || '-'}</small></td>
+                    <td>${shortText(r.hazard_title, 72)}<br><small style="color:var(--text-muted);">Sorumlu: ${r.responsible_person || '-'}</small></td>
+                    <td>${terminHtml}</td>
+                    <td>${statusBadge(r.status)}<br><a class="small-link" href="actions.html">Aç</a></td>
+                </tr>`;
+        });
+    }
+
+    function renderMonthVisits(visits, today) {
+        const tbody = document.getElementById('month_visits_tbody');
+        const upcoming = visits.filter(v => !v.visit_date || v.visit_date >= today).slice(0, 6);
+        const list = upcoming.length > 0 ? upcoming : visits.slice(0, 6);
+        if (list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="empty-state">Bu ay planlanmış saha ziyareti yok.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = '';
+        list.forEach(v => {
+            const compName = v.customer_companies ? v.customer_companies.company_name : 'Bilinmeyen Firma';
+            tbody.innerHTML += `
+                <tr>
+                    <td>${v.visit_date || '-'}</td>
+                    <td><strong>${compName}</strong><br><small style="color:var(--text-muted);">${v.assigned_staff || 'Atanmamış'}</small></td>
+                    <td>${v.planned_minutes || 0} dk</td>
+                </tr>`;
+        });
     }
 
     async function handleLogout() { await dbClient.auth.signOut(); window.location.href = "login.html"; }
