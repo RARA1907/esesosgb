@@ -41,6 +41,7 @@
         .badge-green { background:#dcfce7; color:#15803d; }
         .badge-red { background:#fee2e2; color:#b91c1c; }
         .badge-blue { background:#dbeafe; color:#1d4ed8; }
+        .invite-sent { color:#15803d; font-weight:800; } .invite-failed { color:#b91c1c; font-weight:800; } .invite-none { color:var(--text-muted); font-weight:700; }
         .muted { color:var(--text-muted); }
         .status { margin-top:12px; font-size:12px; font-weight:800; }
         .status.ok { color:#15803d; } .status.err { color:#b91c1c; }
@@ -95,11 +96,11 @@
             <label>Admin E-posta</label>
             <input id="admin_email" type="email" placeholder="admin@firma.com">
             <div class="actions">
-                <button class="btn btn-primary" onclick="createTenantWithAdmin()">Müşteriyi ve Admini Oluştur</button>
+                <button class="btn btn-primary" onclick="createTenantWithAdmin()">Müşteriyi, Admini Oluştur ve Davet Gönder</button>
                 <button class="btn btn-secondary" onclick="clearForm()">Temizle</button>
             </div>
             <div id="form_status" class="status"></div>
-            <p class="muted" style="font-size:12px;line-height:1.45;margin-top:14px;">Bu adım Auth şifresi/davet e-postası oluşturmaz. Bir sonraki adımda “Davet Gönder” Edge Function ile eklenecek. Şimdilik müşteri tenant kaydı ve adminin uygulama rol kaydı oluşturulur.</p>
+            <p class="muted" style="font-size:12px;line-height:1.45;margin-top:14px;">Bu adım müşteri tenant kaydını ve ilk adminin uygulama rol kaydını oluşturur. Edge Function kurulumu tamamlandıysa ilk admin davet e-postası da otomatik gönderilir.</p>
         </div>
 
         <div class="panel">
@@ -133,6 +134,32 @@ function previewLoginLink(){ const slug=slugify(document.getElementById('tenant_
 document.getElementById('tenant_name').addEventListener('input',()=>{ const slugEl=document.getElementById('tenant_slug'); if(!slugEl.dataset.touched){ slugEl.value=slugify(document.getElementById('tenant_name').value); previewLoginLink(); }});
 document.getElementById('tenant_slug').addEventListener('input',()=>{ document.getElementById('tenant_slug').dataset.touched='1'; });
 function setStatus(msg, ok=true){ const el=document.getElementById('form_status'); el.className='status '+(ok?'ok':'err'); el.innerText=msg; }
+
+function inviteStatusText(status, invitedAt){
+  const s=(status||'not_sent').toString();
+  if(s==='sent') return `<span class="invite-sent">Davet gönderildi</span><br><span class="muted">${invitedAt ? new Date(invitedAt).toLocaleString('tr-TR') : ''}</span>`;
+  if(s==='failed') return `<span class="invite-failed">Davet hatası</span>`;
+  return `<span class="invite-none">Davet yok</span>`;
+}
+async function callInviteFunction(staffId){
+  const { data: { session } } = await dbClient.auth.getSession();
+  if(!session){ alert('Oturum bulunamadı. Lütfen tekrar giriş yap.'); return false; }
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/invite-staff-user`, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${session.access_token}`, 'apikey':SUPABASE_KEY },
+    body: JSON.stringify({ staff_id: staffId, site_origin: window.location.origin })
+  });
+  const result = await response.json().catch(()=>({}));
+  if(!response.ok || !result.ok){ alert('Davet gönderilemedi: ' + (result.error || response.statusText)); return false; }
+  alert('Davet e-postası gönderildi: ' + (result.email || ''));
+  return true;
+}
+async function inviteTenantAdmin(staffId, email){
+  if(!confirm(`${email || 'Bu admin'} için davet e-postası gönderilsin mi?`)) return;
+  const ok = await callInviteFunction(staffId);
+  if(ok) loadTenants();
+}
+
 function clearForm(){ ['tenant_name','tenant_slug','tenant_logo','admin_name','admin_email'].forEach(id=>document.getElementById(id).value=''); document.getElementById('tenant_color').value='#2563eb'; document.getElementById('tenant_slug').dataset.touched=''; previewLoginLink(); setStatus(''); }
 async function createTenantWithAdmin(){
   try{
@@ -146,9 +173,13 @@ async function createTenantWithAdmin(){
     if(!adminName || !adminEmail) throw new Error('İlk admin adı ve e-postası zorunlu.');
     const {data:tenant, error:tErr}=await dbClient.from('tenants').insert({name, slug, logo_url:logo, primary_color:color, is_active:true}).select().single();
     if(tErr) throw tErr;
-    const {error:sErr}=await dbClient.from('osgb_staff').insert({tenant_id:tenant.id, name_surname:adminName, staff_role:'Yönetici', certificate_class:'Yok', email:adminEmail, hire_date:new Date().toISOString().slice(0,10), is_active_manual:'Aktif', access_role:'admin', can_login:true});
+    const {data:staff, error:sErr}=await dbClient.from('osgb_staff').insert({tenant_id:tenant.id, name_surname:adminName, staff_role:'Yönetici', certificate_class:'Yok', email:adminEmail, hire_date:new Date().toISOString().slice(0,10), is_active_manual:'Aktif', access_role:'admin', can_login:true, auth_invite_status:'not_sent'}).select().single();
     if(sErr) throw sErr;
-    setStatus(`Müşteri oluşturuldu. Giriş linki: ${tenantLoginUrl(slug)}`, true);
+    setStatus(`Müşteri oluşturuldu. Giriş linki: ${tenantLoginUrl(slug)}. Davet gönderiliyor...`, true);
+    if(staff && staff.id){
+      const invited = await callInviteFunction(staff.id);
+      setStatus(invited ? `Müşteri oluşturuldu ve admin daveti gönderildi. Giriş linki: ${tenantLoginUrl(slug)}` : `Müşteri oluşturuldu ama davet gönderilemedi. Listeden tekrar deneyebilirsin. Giriş linki: ${tenantLoginUrl(slug)}`, invited);
+    }
     await loadTenants();
   }catch(err){ setStatus('Hata: '+err.message, false); }
 }
@@ -160,8 +191,8 @@ async function loadTenants(){
   if(!tenants || tenants.length===0){ tbody.innerHTML='<tr><td colspan="5" class="muted">Kayıtlı müşteri yok.</td></tr>'; return; }
   tbody.innerHTML='';
   for(const t of tenants){
-    const {data:admins}=await dbClient.from('osgb_staff').select('name_surname,email,access_role').eq('tenant_id', t.id).in('access_role',['admin','super_admin']);
-    const adminsHtml=(admins||[]).map(a=>`<strong>${escapeHtml(a.name_surname||'-')}</strong><br><span class="muted">${escapeHtml(a.email||'-')} • ${escapeHtml(a.access_role||'-')}</span>`).join('<hr style="border:none;border-top:1px solid #e2e8f0;">') || '<span class="muted">Admin yok</span>';
+    const {data:admins}=await dbClient.from('osgb_staff').select('id,name_surname,email,access_role,auth_invite_status,auth_invited_at').eq('tenant_id', t.id).in('access_role',['admin','super_admin']);
+    const adminsHtml=(admins||[]).map(a=>`<strong>${escapeHtml(a.name_surname||'-')}</strong><br><span class="muted">${escapeHtml(a.email||'-')} • ${escapeHtml(a.access_role||'-')}</span><br>${inviteStatusText(a.auth_invite_status, a.auth_invited_at)}<br><button class="btn btn-green btn-small" onclick="inviteTenantAdmin('${a.id}', '${escapeHtml(a.email||'')}')">Davet Gönder</button>`).join('<hr style="border:none;border-top:1px solid #e2e8f0;">') || '<span class="muted">Admin yok</span>';
     const active=t.is_active!==false;
     tbody.innerHTML += `<tr>
       <td><strong>${escapeHtml(t.name)}</strong><br><span class="muted">slug: ${escapeHtml(t.slug)}</span></td>
