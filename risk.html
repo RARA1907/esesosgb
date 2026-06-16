@@ -159,7 +159,7 @@
         <label>Kanıt Fotoğrafı (Offline destekli)</label>
         <input type="file" id="risk_photo" accept="image/*" capture="environment" onchange="previewRiskPhoto()">
         <img id="risk_photo_preview" class="photo-preview" alt="Seçilen risk fotoğrafı önizlemesi">
-        <div style="font-size:12px; color:var(--text-muted); margin-top:6px;">Fotoğraf internet yokken cihazda saklanır; bağlantı gelince Supabase Storage'a yüklenir.</div>
+        <div id="photo_compress_status" style="font-size:12px; color:var(--text-muted); margin-top:6px;">Fotoğraf seçildiğinde otomatik sıkıştırılır; internet yokken cihazda saklanır, bağlantı gelince Supabase Storage'a yüklenir.</div>
     </div>
 
     <div class="offline-panel">
@@ -362,13 +362,105 @@
         return 'local_' + Date.now() + '_' + Math.random().toString(16).slice(2);
     }
 
-    function previewRiskPhoto() {
+    let selectedCompressedRiskPhoto = null;
+
+    function formatBytes(bytes) {
+        if (!bytes && bytes !== 0) return '-';
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+    }
+
+    function loadImageFromFile(file) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            const objectUrl = URL.createObjectURL(file);
+            img.onload = function () { URL.revokeObjectURL(objectUrl); resolve(img); };
+            img.onerror = function () { URL.revokeObjectURL(objectUrl); reject(new Error('Fotoğraf okunamadı.')); };
+            img.src = objectUrl;
+        });
+    }
+
+    async function compressImageFile(file, maxWidth, quality) {
+        if (!file || !file.type || !file.type.startsWith('image/')) {
+            return { blob: file, name: file ? file.name : null, type: file ? file.type : null, originalSize: file ? file.size : 0, compressedSize: file ? file.size : 0, compressed: false };
+        }
+
+        const img = await loadImageFromFile(file);
+        const limitWidth = maxWidth || 1280;
+        const ratio = img.width > limitWidth ? limitWidth / img.width : 1;
+        const targetWidth = Math.round(img.width * ratio);
+        const targetHeight = Math.round(img.height * ratio);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+        const blob = await new Promise((resolve) => {
+            canvas.toBlob(resolve, 'image/jpeg', quality || 0.72);
+        });
+
+        if (!blob || blob.size >= file.size) {
+            return { blob: file, name: file.name, type: file.type || 'image/jpeg', originalSize: file.size, compressedSize: file.size, compressed: false };
+        }
+
+        const baseName = (file.name || 'risk-photo').replace(/\.[^.]+$/, '');
+        return {
+            blob: blob,
+            name: baseName + '.jpg',
+            type: 'image/jpeg',
+            originalSize: file.size,
+            compressedSize: blob.size,
+            compressed: true,
+            width: targetWidth,
+            height: targetHeight
+        };
+    }
+
+    async function previewRiskPhoto() {
         const fileInput = document.getElementById('risk_photo');
         const preview = document.getElementById('risk_photo_preview');
+        const status = document.getElementById('photo_compress_status');
         const file = fileInput.files && fileInput.files[0];
-        if (!file) { preview.style.display = 'none'; preview.src = ''; return; }
-        preview.src = URL.createObjectURL(file);
-        preview.style.display = 'block';
+
+        selectedCompressedRiskPhoto = null;
+        if (!file) {
+            preview.style.display = 'none';
+            preview.src = '';
+            if (status) status.innerText = 'Fotoğraf seçildiğinde otomatik sıkıştırılır; internet yokken cihazda saklanır, bağlantı gelince Supabase Storage\'a yüklenir.';
+            return;
+        }
+
+        if (status) {
+            status.style.color = 'var(--text-muted)';
+            status.innerText = 'Fotoğraf hazırlanıyor ve sıkıştırılıyor...';
+        }
+
+        try {
+            selectedCompressedRiskPhoto = await compressImageFile(file, 1280, 0.72);
+            preview.src = URL.createObjectURL(selectedCompressedRiskPhoto.blob);
+            preview.style.display = 'block';
+
+            if (status) {
+                if (selectedCompressedRiskPhoto.compressed) {
+                    status.style.color = 'var(--accent-green)';
+                    status.innerText = `Fotoğraf sıkıştırıldı: ${formatBytes(selectedCompressedRiskPhoto.originalSize)} → ${formatBytes(selectedCompressedRiskPhoto.compressedSize)} (${selectedCompressedRiskPhoto.width}x${selectedCompressedRiskPhoto.height}).`;
+                } else {
+                    status.style.color = 'var(--text-muted)';
+                    status.innerText = `Fotoğraf zaten uygun boyutta: ${formatBytes(selectedCompressedRiskPhoto.originalSize)}.`;
+                }
+            }
+        } catch (err) {
+            selectedCompressedRiskPhoto = { blob: file, name: file.name, type: file.type, originalSize: file.size, compressedSize: file.size, compressed: false };
+            preview.src = URL.createObjectURL(file);
+            preview.style.display = 'block';
+            if (status) {
+                status.style.color = '#c2410c';
+                status.innerText = 'Fotoğraf sıkıştırılamadı; orijinal dosya kullanılacak. Detay: ' + (err.message || err);
+            }
+        }
     }
 
     function updateConnectionStatus() {
@@ -421,6 +513,15 @@
 
         if(!compId || !hazard || !target) { alert("Lütfen firma, tehlike tanımı ve termin tarihini doldurun!"); return; }
 
+        let preparedPhoto = selectedCompressedRiskPhoto;
+        if (photoFile && !preparedPhoto) {
+            preparedPhoto = await compressImageFile(photoFile, 1280, 0.72);
+        }
+
+        const photoBlob = preparedPhoto ? preparedPhoto.blob : null;
+        const photoName = preparedPhoto ? preparedPhoto.name : null;
+        const photoType = preparedPhoto ? (preparedPhoto.type || 'image/jpeg') : null;
+
         const localRisk = {
             local_id: makeLocalId(),
             company_id: compId,
@@ -431,9 +532,12 @@
             risk_score: (o * f * sev),
             target_date: target,
             status: 'Açık',
-            photo_blob: photoFile,
-            photo_name: photoFile ? photoFile.name : null,
-            photo_type: photoFile ? photoFile.type : null,
+            photo_blob: photoBlob,
+            photo_name: photoName,
+            photo_type: photoType,
+            photo_original_size: preparedPhoto ? preparedPhoto.originalSize : null,
+            photo_compressed_size: preparedPhoto ? preparedPhoto.compressedSize : null,
+            photo_was_compressed: preparedPhoto ? preparedPhoto.compressed : false,
             sync_status: 'pending',
             created_at: new Date().toISOString(),
             created_offline: !navigator.onLine
@@ -446,6 +550,12 @@
         document.getElementById('risk_photo').value = '';
         document.getElementById('risk_photo_preview').style.display = 'none';
         document.getElementById('risk_photo_preview').src = '';
+        selectedCompressedRiskPhoto = null;
+        const photoStatus = document.getElementById('photo_compress_status');
+        if (photoStatus) {
+            photoStatus.style.color = 'var(--text-muted)';
+            photoStatus.innerText = 'Fotoğraf seçildiğinde otomatik sıkıştırılır; internet yokken cihazda saklanır, bağlantı gelince Supabase Storage\'a yüklenir.';
+        }
 
         document.getElementById('offline_status').style.color = navigator.onLine ? 'var(--text-muted)' : '#c2410c';
         document.getElementById('offline_status').innerText = navigator.onLine
