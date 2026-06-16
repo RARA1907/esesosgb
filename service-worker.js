@@ -1,4 +1,4 @@
-const CACHE_NAME = 'osgb-saas-cache-v2';
+const CACHE_NAME = 'osgb-saas-cache-v3';
 const APP_SHELL = [
   './',
   './risk.html',
@@ -32,6 +32,13 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
   const isAppFile = url.origin === self.location.origin;
+  const isSupabaseRequest = url.hostname.endsWith('.supabase.co');
+
+  // Supabase API ve Storage istekleri asla cache'lenmemeli.
+  // Aksi halde internet geri gelince tablo eski Supabase cevabini gosterebilir.
+  if (isSupabaseRequest) {
+    return;
+  }
 
   if (isAppFile) {
     event.respondWith(
@@ -49,6 +56,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Supabase disindaki harici kaynaklar icin cache-first kullanabiliriz.
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
