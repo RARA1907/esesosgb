@@ -20,7 +20,6 @@
         .nav-link { display: block; text-align: center; margin-top: 15px; color: #64748b; text-decoration: none; font-size: 14px; }
         #status { margin-top: 15px; text-align: center; font-weight: bold; }
 
-        /* Canlı Tablo Tasarımı */
         .table-container { margin-top: 35px; border-top: 2px solid #e2e8f0; padding-top: 20px; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
         th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
@@ -32,8 +31,15 @@
 
 <div class="card">
     <h2>🦺 Fine-Kinney Risk Analiz Motoru</h2>
-    <p style="color: #64748b; font-size: 14px;">Sahada tespit edilen tehlikeyi ve parametreleri girin. Skor otomatik hesaplanır.</p>
+    <p style="color: #64748b; font-size: 14px;">Sahada tespit edilen tehlikeyi girin ve ilgili firmayla ilişkilendirin.</p>
     
+    <div class="form-group">
+        <label>İlgili Müşteri Firma</label>
+        <select id="company_select">
+            <option value="">Firmalar yükleniyor...</option>
+        </select>
+    </div>
+
     <div class="form-group">
         <label>Tehlike Tanımı / Bulgusu</label>
         <textarea id="hazard_title" rows="2" placeholder="Örn: Yüksekte çalışma alanında yaşam hattının bulunmaması..."></textarea>
@@ -91,8 +97,8 @@
         <table>
             <thead>
                 <tr>
+                    <th>Firma Unvanı</th>
                     <th>Tehlike Tanımı</th>
-                    <th>O x F x Ş</th>
                     <th>Skor</th>
                     <th>Risk Seviyesi</th>
                     <th>Termin</th>
@@ -125,9 +131,26 @@
         } else {
             document.body.style.display = "block";
             calculateFineKinney();
-            fetchRisks(); // Canlı listeyi çağırıyoruz
+            await fetchCompaniesToSelect(); // Önce firmaları yükle
+            fetchRisks(); // Sonra riskleri listele
         }
     };
+
+    // FİRMALARI SEÇİM KUTUSUNA DOLDURAN FONKSİYON
+    async function fetchCompaniesToSelect() {
+        const select = document.getElementById('company_select');
+        try {
+            const { data } = await dbClient.from('customer_companies').select('id, company_name').order('company_name');
+            if (data && data.length > 0) {
+                select.innerHTML = '<option value="">-- Lütfen Firma Seçin --</option>';
+                data.forEach(c => {
+                    select.innerHTML += `<option value="${c.id}">${c.company_name}</option>`;
+                });
+            } else {
+                select.innerHTML = '<option value="">Sistemde kayıtlı firma yok!</option>';
+            }
+        } catch (err) { console.error(err.message); }
+    }
 
     function calculateFineKinney() {
         const o = parseFloat(document.getElementById('prob').value);
@@ -142,11 +165,16 @@
         else { lvl.innerText = "ESASLI RİSK (İŞİ DURDUR)"; lvl.style.color = "red"; }
     }
 
-    // SUPABASE'DEN RİSKLERİ ÇEKEN FONKSİYON
+    // İLİŞKİSEL OLARAK RİSKLERİ FİRMA ADIYLA BERABER ÇEKEN FONKSİYON
     async function fetchRisks() {
         const tbody = document.getElementById('risk_table_body');
         try {
-            const { data } = await dbClient.from('risk_assessments').select('*').order('created_at', { ascending: false });
+            // Supabase Join yapısı: customer_companies tablosundan unvanı otomatik bağlıyoruz
+            const { data } = await dbClient
+                .from('risk_assessments')
+                .select('*, customer_companies(company_name)')
+                .order('created_at', { ascending: false });
+
             if (!data || data.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#94a3b8;">Kayıtlı risk bulgusu yok.</td></tr>`;
                 return;
@@ -158,10 +186,12 @@
                 else if(r.risk_score >= 70 && r.risk_score < 200) { badgeColor = '#fee2e2'; textColor = '#b91c1c'; lvlText = 'Önemli'; }
                 else if(r.risk_score >= 200) { badgeColor = '#f87171'; textColor = '#ffffff'; lvlText = 'ESASLI'; }
 
+                const compName = r.customer_companies ? r.customer_companies.company_name : 'Bilinmeyen Firma';
+
                 tbody.innerHTML += `
                     <tr>
-                        <td><strong>${r.hazard_title}</strong></td>
-                        <td>${r.probability_o}x${r.frequency_f}x${r.severity_s}</td>
+                        <td><strong>${compName}</strong></td>
+                        <td>${r.hazard_title}</td>
                         <td>${r.risk_score}</td>
                         <td><span class="badge" style="background:${badgeColor}; color:${textColor};">${lvlText}</span></td>
                         <td>${r.target_date}</td>
@@ -172,6 +202,7 @@
     }
 
     async function saveRisk() {
+        const compId = document.getElementById('company_select').value;
         const hazard = document.getElementById('hazard_title').value;
         const o = parseFloat(document.getElementById('prob').value);
         const f = parseFloat(document.getElementById('freq').value);
@@ -180,16 +211,25 @@
         const target = document.getElementById('target_date').value;
         const statusDiv = document.getElementById('status');
 
-        if(!hazard || !target) { statusDiv.style.color = "red"; statusDiv.innerText = "Lütfen tüm alanları doldurun!"; return; }
+        if(!compId || !hazard || !target) { statusDiv.style.color = "red"; statusDiv.innerText = "Lütfen firma dahil tüm alanları doldurun!"; return; }
         statusDiv.style.color = "blue"; statusDiv.innerText = "Risk raporu buluta yazılıyor...";
 
-        const { error } = await dbClient.from('risk_assessments').insert([{ hazard_title: hazard, probability_o: o, frequency_f: f, severity_s: s, risk_score: score, target_date: target, status: 'Açık' }]);
+        const { error } = await dbClient.from('risk_assessments').insert([{ 
+            company_id: compId,
+            hazard_title: hazard, 
+            probability_o: o, 
+            frequency_f: f, 
+            severity_s: s, 
+            risk_score: score, 
+            target_date: target, 
+            status: 'Açık' 
+        }]);
 
         if (error) { statusDiv.style.color = "red"; statusDiv.innerText = "Hata: " + error.message; }
         else {
-            statusDiv.style.color = "green"; statusDiv.innerText = "🚀 Risk Raporu Başarıyla Veritabanına Eklendi!";
+            statusDiv.style.color = "green"; statusDiv.innerText = "🚀 Risk Raporu İlgili Firmaya Bağlanarak Kaydedildi!";
             document.getElementById('hazard_title').value = ''; document.getElementById('target_date').value = '';
-            fetchRisks(); // Tabloyu anlık yeniliyoruz
+            fetchRisks();
         }
     }
 </script>
