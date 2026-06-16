@@ -181,7 +181,7 @@
             }
 
             // Bağımsız risk tablosundan veri çekme
-            const { data: risks } = await dbClient.from('risk_assessments').select('id');
+            const { data: risks } = await dbClient.from('risk_assessments').select('id').eq('status', 'Açık');
             if (risks) {
                 document.getElementById('stat_total_risks').innerText = risks.length;
             }
