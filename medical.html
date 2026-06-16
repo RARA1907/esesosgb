@@ -17,7 +17,6 @@
         .nav-link { display: block; text-align: center; margin-top: 15px; color: #64748b; text-decoration: none; font-size: 14px; }
         #status { margin-top: 15px; text-align: center; font-weight: bold; }
 
-        /* Canlı Medikal Tablo Tasarımı */
         .table-container { margin-top: 35px; border-top: 2px solid #bbf7d0; padding-top: 20px; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
         th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
@@ -29,21 +28,28 @@
 
 <div class="card">
     <h2>🩺 Periyodik Muayene & Sağlık Kartı Girişi</h2>
-    <p style="color: #64748b; font-size: 14px;">İşyeri hekimi klinik bulgularını girer. Bu veriler medikal gizlilik standartlarında saklanır.</p>
+    <p style="color: #64748b; font-size: 14px;">Klinik bulguları girip ilgili firmayla ilişkilendirin.</p>
     
     <div class="form-group">
+        <label>İlgili Müşteri Firma</label>
+        <select id="company_select">
+            <option value="">Firmalar yükleniyor...</option>
+        </select>
+    </div>
+
+    <div class="form-group">
         <label>Göz Muayene Bulguları (Ek-2)</label>
-        <input type="text" id="goz" placeholder="Örn: Sol 0.8, Sağ 1.0 Tam, Renk Körlüğü Yok">
+        <input type="text" id="goz" placeholder="Örn: Sol 0.8, Sağ 1.0 Tam">
     </div>
 
     <div class="form-group">
         <label>Kardiyovasküler (Kalp/Tansiyon) Bulguları</label>
-        <input type="text" id="kalp" placeholder="Örn: TA: 120/80 mmHg, Nabız: 74/dk Ritmic">
+        <input type="text" id="kalp" placeholder="Örn: TA: 120/80 mmHg">
     </div>
 
     <div class="form-group">
         <label>Kas-İskelet Sistemi Bulguları</label>
-        <input type="text" id="kas" placeholder="Örn: Hareket kısıtlılığı yok, skolyoz izlenmedi">
+        <input type="text" id="kas" placeholder="Örn: Hareket kısıtlılığı yok">
     </div>
 
     <div class="form-group">
@@ -64,9 +70,9 @@
         <table>
             <thead>
                 <tr>
+                    <th>Firma Unvanı</th>
                     <th>Göz Bulgusu</th>
                     <th>Kalp/Tansiyon</th>
-                    <th>Kas-İskelet</th>
                     <th>Hekim Kararı</th>
                 </tr>
             </thead>
@@ -96,26 +102,42 @@
             window.location.href = "index.html";
         } else {
             document.body.style.display = "block";
-            fetchMedicalRecords(); // Canlı medikal listeyi çağırıyoruz
+            await fetchCompaniesToSelect(); // Önce firmaları yükle
+            fetchMedicalRecords(); // Sonra listele
         }
     };
 
-    // SUPABASE'DEN MEDİKAL KAYITLARI ÇEKEN FONKSİYON
+    async function fetchCompaniesToSelect() {
+        const select = document.getElementById('company_select');
+        try {
+            const { data } = await dbClient.from('customer_companies').select('id, company_name').order('company_name');
+            if (data && data.length > 0) {
+                select.innerHTML = '<option value="">-- Lütfen Firma Seçin --</option>';
+                data.forEach(c => { select.innerHTML += `<option value="${c.id}">${c.company_name}</option>`; });
+            } else { select.innerHTML = '<option value="">Sistemde kayıtlı firma yok!</option>'; }
+        } catch (err) { console.error(err.message); }
+    }
+
     async function fetchMedicalRecords() {
         const tbody = document.getElementById('medical_table_body');
         try {
-            const { data } = await dbClient.from('worker_medical_records').select('*').order('created_at', { ascending: false });
+            const { data } = await dbClient
+                .from('worker_medical_records')
+                .select('*, customer_companies(company_name)')
+                .order('created_at', { ascending: false });
+
             if (!data || data.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#94a3b8;">Kayıtlı muayene kartı bulunmuyor.</td></tr>`;
                 return;
             }
             tbody.innerHTML = '';
             data.forEach(m => {
+                const compName = m.customer_companies ? m.customer_companies.company_name : 'Bilinmeyen Firma';
                 tbody.innerHTML += `
                     <tr>
+                        <td><strong>${compName}</strong></td>
                         <td>${m.goz_secure || '-'}</td>
                         <td>${m.kalp_secure || '-'}</td>
-                        <td>${m.kas_secure || '-'}</td>
                         <td><span class="badge-decision">${m.final_decision}</span></td>
                     </tr>
                 `;
@@ -124,22 +146,29 @@
     }
 
     async function saveMedical() {
+        const compId = document.getElementById('company_select').value;
         const gozVal = document.getElementById('goz').value;
         const kalpVal = document.getElementById('kalp').value;
         const kasVal = document.getElementById('kas').value;
         const decisionVal = document.getElementById('decision').value;
         const statusDiv = document.getElementById('status');
 
-        if(!gozVal || !kalpVal || !kasVal) { statusDiv.style.color = "red"; statusDiv.innerText = "Lütfen klinik bulguları boş bırakmayın!"; return; }
-        statusDiv.style.color = "blue"; statusDiv.innerText = "Medikal kayıt şifrelenerek gönderiliyor...";
+        if(!compId || !gozVal || !kalpVal || !kasVal) { statusDiv.style.color = "red"; statusDiv.innerText = "Lütfen firma dahil tüm alanları doldurun!"; return; }
+        statusDiv.style.color = "blue"; statusDiv.innerText = "Medikal kayıt gönderiliyor...";
 
-        const { error } = await dbClient.from('worker_medical_records').insert([{ goz_secure: gozVal, kalp_secure: kalpVal, kas_secure: kasVal, final_decision: decisionVal }]);
+        const { error } = await dbClient.from('worker_medical_records').insert([{ 
+            company_id: compId,
+            goz_secure: gozVal, 
+            kalp_secure: kalpVal, 
+            kas_secure: kasVal, 
+            final_decision: decisionVal 
+        }]);
 
         if (error) { statusDiv.style.color = "red"; statusDiv.innerText = "Hata: " + error.message; }
         else {
-            statusDiv.style.color = "green"; statusDiv.innerText = "🚀 Muayene Kartı Başarıyla Canlı Veritabanına Yazıldı!";
+            statusDiv.style.color = "green"; statusDiv.innerText = "🚀 Muayene Kartı İlgili Firmaya Bağlanarak Kaydedildi!";
             document.getElementById('goz').value = ''; document.getElementById('kalp').value = ''; document.getElementById('kas').value = '';
-            fetchMedicalRecords(); // Tabloyu anlık yeniliyoruz
+            fetchMedicalRecords();
         }
     }
 </script>
