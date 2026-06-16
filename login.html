@@ -20,7 +20,8 @@
 <body>
 
 <div class="login-card">
-    <h2>🏢 OSGB SaaS Giriş</h2>
+    <h2>🏢 <span id="tenant_title">OSGB SaaS</span> Giriş</h2>
+    <div id="tenant_hint" style="text-align:center; color:#64748b; font-size:13px; margin-top:-15px; margin-bottom:20px;">Sistem giriş paneli</div>
     
     <div class="form-group">
         <label>E-Posta Adresi</label>
@@ -40,6 +41,27 @@
     const SUPABASE_URL = "https://dnvuizausfcjzkcsynql.supabase.co";
     const SUPABASE_KEY = "sb_publishable_LtrytF9wyS3u-KgSZk7heg_SZc7hhoY";
     const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+
+    async function loadTenantBrand() {
+        const params = new URLSearchParams(window.location.search);
+        const slug = params.get('tenant') || localStorage.getItem('tenant_slug') || 'eses';
+        localStorage.setItem('tenant_slug', slug);
+        try {
+            const { data, error } = await dbClient.from('tenants').select('name, slug, logo_url, primary_color, is_active').eq('slug', slug).maybeSingle();
+            if (!error && data) {
+                document.getElementById('tenant_title').innerText = data.name || 'OSGB SaaS';
+                document.getElementById('tenant_hint').innerText = 'Giriş adresi: ' + window.location.origin + '/login.html?tenant=' + data.slug;
+                if (data.primary_color) {
+                    document.querySelector('button').style.background = data.primary_color;
+                }
+            }
+        } catch (err) {
+            console.warn('Tenant bilgisi okunamadı:', err.message);
+        }
+    }
+
+    window.onload = loadTenantBrand;
 
     async function handleLogin() {
         const email = document.getElementById('email').value;
@@ -70,7 +92,8 @@
             
             // Giriş token'ını tarayıcı hafızasında tutup ana panele atıyoruz
             setTimeout(() => {
-                window.location.href = "dashboard.html";
+                const slug = localStorage.getItem('tenant_slug') || 'eses';
+                window.location.href = 'dashboard.html?tenant=' + encodeURIComponent(slug);
             }, 1000);
         }
     }

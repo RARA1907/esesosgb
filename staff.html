@@ -76,7 +76,7 @@
     <!-- 🏛️ GLOBAL STANDART ÜST BAR -->
     <div class="global-header">
         <div class="top-row">
-            <div class="logo-area">🏢 <span>AKAD OSGB</span> <span class="logo-badge">SaaS</span></div>
+            <div class="logo-area">🏢 <span>Eses Software</span> <span class="logo-badge">SaaS</span></div>
             <div class="controls-group">
                 <div class="theme-selector-container">
                     <span style="font-size: 11px; font-weight: bold; color: var(--text-muted); margin-right: 2px;">🎨 TEMA:</span>
@@ -118,7 +118,7 @@
         <div class="form-group"><label>Manuel Durum Kilidi (Karar Üstünlüğü)</label><select id="is_active_manual"><option value="Otomatik">Otomatik (Tarih Geçerli)</option><option value="Aktif">Manuel Aktif</option><option value="Pasif">Manuel Pasif</option></select></div>
     </div>
     <div class="grid-row-3">
-        <div class="form-group"><label>Sistem Erişim Yetkisi</label><select id="access_role"><option value="uzman">İSG Uzmanı</option><option value="hekim">İşyeri Hekimi</option><option value="dsp">DSP</option><option value="admin">Admin / Yönetici</option><option value="firma_yetkilisi">Firma Yetkilisi</option></select></div>
+        <div class="form-group"><label>Sistem Erişim Yetkisi</label><select id="access_role"><option value="super_admin">Super Admin / SaaS Sahibi</option><option value="uzman">İSG Uzmanı</option><option value="hekim">İşyeri Hekimi</option><option value="dsp">DSP</option><option value="admin">Admin / Yönetici</option><option value="firma_yetkilisi">Firma Yetkilisi</option></select></div>
         <div class="form-group"><label>Sisteme Giriş İzni</label><select id="can_login"><option value="true">Aktif - Giriş Yapabilir</option><option value="false">Pasif - Giriş Yapamaz</option></select></div>
     </div>
     <button class="submit-btn" onclick="saveStaff()">Personel Kartını Kadroya İşle</button>
@@ -149,7 +149,7 @@
         <input type="hidden" id="modal_staff_id">
         <div class="form-group" style="margin-bottom:12px;"><label>Adı Soyadı</label><input type="text" id="modal_staff_name"></div>
         <div class="form-group" style="margin-bottom:12px;"><label>E-Posta</label><input type="email" id="modal_staff_email"></div>
-        <div class="form-group" style="margin-bottom:12px;"><label>Sistem Erişim Yetkisi</label><select id="modal_access_role"><option value="uzman">İSG Uzmanı</option><option value="hekim">İşyeri Hekimi</option><option value="dsp">DSP</option><option value="admin">Admin / Yönetici</option><option value="firma_yetkilisi">Firma Yetkilisi</option></select></div>
+        <div class="form-group" style="margin-bottom:12px;"><label>Sistem Erişim Yetkisi</label><select id="modal_access_role"><option value="super_admin">Super Admin / SaaS Sahibi</option><option value="uzman">İSG Uzmanı</option><option value="hekim">İşyeri Hekimi</option><option value="dsp">DSP</option><option value="admin">Admin / Yönetici</option><option value="firma_yetkilisi">Firma Yetkilisi</option></select></div>
         <div class="form-group" style="margin-bottom:12px;"><label>Sisteme Giriş İzni</label><select id="modal_can_login"><option value="true">Aktif - Giriş Yapabilir</option><option value="false">Pasif - Giriş Yapamaz</option></select></div>
         <div class="form-group" style="margin-bottom:12px;"><label>Kilit Durumu</label><select id="modal_is_active_manual"><option value="Otomatik">Otomatik</option><option value="Aktif">Manuel Aktif</option><option value="Pasif">Manuel Pasif</option></select></div>
         <div class="modal-buttons">
@@ -163,12 +163,14 @@
     const SUPABASE_URL = "https://dnvuizausfcjzkcsynql.supabase.co";
     const SUPABASE_KEY = "sb_publishable_LtrytF9wyS3u-KgSZk7heg_SZc7hhoY";
     const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    let CURRENT_AUTH = null;
 
     // 🔐 GERÇEK ROL / ERİŞİM YARDIMCILARI
     // Öncelik: osgb_staff.access_role + can_login + aktiflik bilgisi.
     // Geçiş döneminde kayıt bulunamazsa e-posta bazlı eski mantığa güvenli fallback yapılır.
     function normalizeAccessRole(value) {
         const v = (value || '').toString().trim().toLowerCase();
+        if (['super_admin', 'super admin', 'saas_admin', 'sistem sahibi'].includes(v)) return 'super_admin';
         if (['admin', 'yonetici', 'yönetici'].includes(v)) return 'admin';
         if (['uzman', 'isg_uzmani', 'isg uzmanı', 'iş güvenliği uzmanı'].includes(v)) return 'uzman';
         if (['hekim', 'isyeri hekimi', 'işyeri hekimi'].includes(v)) return 'hekim';
@@ -179,6 +181,7 @@
 
     function inferAccessRoleFromEmail(email) {
         const e = (email || '').toLowerCase();
+        if (e.includes('orhan.vardar@gmail.com')) return 'super_admin';
         if (e.includes('admin')) return 'admin';
         if (e.includes('hekim')) return 'hekim';
         if (e.includes('dsp')) return 'dsp';
@@ -210,18 +213,18 @@
         const email = session.user.email || '';
         let staff = null;
         try {
-            const { data } = await dbClient.from('osgb_staff').select('*').ilike('email', email).maybeSingle();
+            const { data } = await dbClient.from('osgb_staff').select('*, tenants(id, name, slug, logo_url, primary_color, is_active)').ilike('email', email).maybeSingle();
             staff = data || null;
         } catch (err) {
             console.warn('Rol kaydı okunamadı, e-posta bazlı geçici role dönülüyor:', err.message);
         }
         const role = normalizeAccessRole(staff && staff.access_role) || normalizeAccessRole(staff && staff.staff_role) || inferAccessRoleFromEmail(email);
         const canLogin = isStaffAccessActive(staff);
-        return { session, email, role, canLogin, staff };
+        return { session, email, role, canLogin, staff, tenant: staff && staff.tenants ? staff.tenants : null, tenant_id: staff ? staff.tenant_id : null };
     }
 
     function canAccessPage(role, page) {
-        if (role === 'admin') return true;
+        if (role === 'super_admin' || role === 'admin') return true;
         if (page === 'risk') return role === 'uzman';
         if (page === 'medical') return role === 'hekim';
         if (page === 'staff') return false;
@@ -230,7 +233,7 @@
     }
 
     function roleLabel(role) {
-        return { admin: 'Admin', uzman: 'İSG Uzmanı', hekim: 'İşyeri Hekimi', dsp: 'DSP', firma_yetkilisi: 'Firma Yetkilisi' }[role] || role || 'Rol yok';
+        return { super_admin: 'Super Admin', admin: 'Admin', uzman: 'İSG Uzmanı', hekim: 'İşyeri Hekimi', dsp: 'DSP', firma_yetkilisi: 'Firma Yetkilisi' }[role] || role || 'Rol yok';
     }
 
     function applyRoleBasedNavigation(role) {
@@ -254,6 +257,8 @@
         }
         const userInfo = document.getElementById('current_user_email');
         if (userInfo) userInfo.innerText = `${auth.email} • ${roleLabel(auth.role)}`;
+        const titleEl = document.getElementById('lbl_osgb_title');
+        if (titleEl) titleEl.innerText = (auth.tenant && auth.tenant.name) ? auth.tenant.name : 'Eses Software';
         applyRoleBasedNavigation(auth.role);
         if (page && !canAccessPage(auth.role, page)) {
             window.location.href = 'dashboard.html';
@@ -282,6 +287,7 @@
         setTheme(activeTheme);
         const auth = await requireAuthAndRole('staff');
         if (!auth) return;
+        CURRENT_AUTH = auth;
         document.body.style.display = "block";
         document.getElementById('hire_date').value = new Date().toISOString().slice(0,10);
         toggleCertClass('staff_role', 'certificate_class');
@@ -330,7 +336,9 @@
 
     async function fetchStaff() {
         const tbody = document.getElementById('staff_table_body');
-        const { data, error } = await dbClient.from('osgb_staff').select('*').order('created_at', { ascending: false });
+        let query = dbClient.from('osgb_staff').select('*, tenants(name, slug)').order('created_at', { ascending: false });
+        if (CURRENT_AUTH && CURRENT_AUTH.role !== 'super_admin' && CURRENT_AUTH.tenant_id) query = query.eq('tenant_id', CURRENT_AUTH.tenant_id);
+        const { data, error } = await query;
         tbody.innerHTML = '';
         if (error) { tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">Hata: ${error.message}</td></tr>`; return; }
         if (!data || data.length === 0) { tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted);">Kayıtlı personel yok.</td></tr>`; return; }
@@ -392,7 +400,8 @@
             termination_date: document.getElementById('termination_date').value || null,
             is_active_manual: document.getElementById('is_active_manual').value,
             access_role: document.getElementById('access_role').value,
-            can_login: document.getElementById('can_login').value === 'true'
+            can_login: document.getElementById('can_login').value === 'true',
+            tenant_id: CURRENT_AUTH ? CURRENT_AUTH.tenant_id : null
         };
         const { error } = await dbClient.from('osgb_staff').insert([payload]);
         if (error) { alert('Kayıt hatası: ' + error.message); return; }

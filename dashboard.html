@@ -87,7 +87,7 @@
 <div class="card">
     <div class="global-header">
         <div class="top-row">
-            <div class="logo-area">🏢 <span id="lbl_osgb_title">AKAD OSGB</span> <span class="logo-badge">SaaS</span></div>
+            <div class="logo-area">🏢 <span id="lbl_osgb_title">Eses Software</span> <span class="logo-badge">SaaS</span></div>
             <div class="controls-group">
                 <div class="theme-selector-container">
                     <span style="font-size: 11px; font-weight: bold; color: var(--text-muted); margin-right: 2px;">🎨 TEMA:</span>
@@ -186,6 +186,7 @@
     // Geçiş döneminde kayıt bulunamazsa e-posta bazlı eski mantığa güvenli fallback yapılır.
     function normalizeAccessRole(value) {
         const v = (value || '').toString().trim().toLowerCase();
+        if (['super_admin', 'super admin', 'saas_admin', 'sistem sahibi'].includes(v)) return 'super_admin';
         if (['admin', 'yonetici', 'yönetici'].includes(v)) return 'admin';
         if (['uzman', 'isg_uzmani', 'isg uzmanı', 'iş güvenliği uzmanı'].includes(v)) return 'uzman';
         if (['hekim', 'isyeri hekimi', 'işyeri hekimi'].includes(v)) return 'hekim';
@@ -196,6 +197,7 @@
 
     function inferAccessRoleFromEmail(email) {
         const e = (email || '').toLowerCase();
+        if (e.includes('orhan.vardar@gmail.com')) return 'super_admin';
         if (e.includes('admin')) return 'admin';
         if (e.includes('hekim')) return 'hekim';
         if (e.includes('dsp')) return 'dsp';
@@ -227,18 +229,18 @@
         const email = session.user.email || '';
         let staff = null;
         try {
-            const { data } = await dbClient.from('osgb_staff').select('*').ilike('email', email).maybeSingle();
+            const { data } = await dbClient.from('osgb_staff').select('*, tenants(id, name, slug, logo_url, primary_color, is_active)').ilike('email', email).maybeSingle();
             staff = data || null;
         } catch (err) {
             console.warn('Rol kaydı okunamadı, e-posta bazlı geçici role dönülüyor:', err.message);
         }
         const role = normalizeAccessRole(staff && staff.access_role) || normalizeAccessRole(staff && staff.staff_role) || inferAccessRoleFromEmail(email);
         const canLogin = isStaffAccessActive(staff);
-        return { session, email, role, canLogin, staff };
+        return { session, email, role, canLogin, staff, tenant: staff && staff.tenants ? staff.tenants : null, tenant_id: staff ? staff.tenant_id : null };
     }
 
     function canAccessPage(role, page) {
-        if (role === 'admin') return true;
+        if (role === 'super_admin' || role === 'admin') return true;
         if (page === 'risk') return role === 'uzman';
         if (page === 'medical') return role === 'hekim';
         if (page === 'staff') return false;
@@ -247,7 +249,7 @@
     }
 
     function roleLabel(role) {
-        return { admin: 'Admin', uzman: 'İSG Uzmanı', hekim: 'İşyeri Hekimi', dsp: 'DSP', firma_yetkilisi: 'Firma Yetkilisi' }[role] || role || 'Rol yok';
+        return { super_admin: 'Super Admin', admin: 'Admin', uzman: 'İSG Uzmanı', hekim: 'İşyeri Hekimi', dsp: 'DSP', firma_yetkilisi: 'Firma Yetkilisi' }[role] || role || 'Rol yok';
     }
 
     function applyRoleBasedNavigation(role) {
@@ -271,6 +273,8 @@
         }
         const userInfo = document.getElementById('current_user_email');
         if (userInfo) userInfo.innerText = `${auth.email} • ${roleLabel(auth.role)}`;
+        const titleEl = document.getElementById('lbl_osgb_title');
+        if (titleEl) titleEl.innerText = (auth.tenant && auth.tenant.name) ? auth.tenant.name : 'Eses Software';
         applyRoleBasedNavigation(auth.role);
         if (page && !canAccessPage(auth.role, page)) {
             window.location.href = 'dashboard.html';
