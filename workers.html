@@ -93,7 +93,20 @@
         const { data: { session } } = await dbClient.auth.getSession();
         if (!session) { window.location.href = "login.html"; return; }
         document.body.style.display = "block";
+        
+        // 1. Önce firmaları seçim kutusuna dolduruyoruz
         await fetchCompaniesToSelect();
+
+        // 2. 🧠 ANA SAYFADAN GELEN URL PARAMETRESİNİ (ID) YAKALIYORUZ
+        const urlParams = new URLSearchParams(window.location.search);
+        const companyIdFromUrl = urlParams.get('id');
+
+        if (companyIdFromUrl) {
+            // Eğer URL'de ID varsa, seçim kutusunda o firmayı otomatik işaretle
+            document.getElementById('company_select').value = companyIdFromUrl;
+            // Ve o firmaya ait listeyi hiç beklemeden otomatik süz
+            fetchWorkers();
+        }
     };
 
     async function fetchCompaniesToSelect() {
@@ -107,7 +120,6 @@
         } catch (err) { console.error(err.message); }
     }
 
-    // SEÇİLEN FİRMANIN PERSONEL KADROSUNU GETİREN FONKSİYON
     async function fetchWorkers() {
         const compId = document.getElementById('company_select').value;
         const tbody = document.getElementById('worker_table_body');
@@ -145,7 +157,7 @@
             document.getElementById('worker_name').value = '';
             document.getElementById('worker_age').value = '';
             document.getElementById('worker_job').value = '';
-            fetchWorkers(); // Listeyi anlık tazele
+            fetchWorkers();
         }
     }
 </script>
