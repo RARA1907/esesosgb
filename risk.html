@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OSGB SaaS - Uzman Risk Motoru</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="manifest" href="manifest.json">
     <style>
         :root {
             --bg-main: #f4f6f9;
@@ -55,6 +56,12 @@
         th, td { padding: 10px; text-align: left; border-bottom: 1px solid var(--border-color); }
         th { background-color: var(--table-header); color: var(--text-muted); font-weight: 600; }
         .badge { padding: 3px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+
+        .photo-box { border: 1px dashed var(--border-color); background: var(--table-header); padding: 12px; border-radius: 8px; margin-bottom: 15px; }
+        .photo-preview { margin-top: 10px; display: none; max-width: 180px; border-radius: 8px; border: 1px solid var(--border-color); }
+        .offline-panel { background: var(--table-header); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin: 15px 0; font-size: 13px; }
+        .offline-panel strong { color: var(--text-main); }
+        .sync-btn { background: var(--text-main); color: var(--bg-card); border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 8px; }
     </style>
 </head>
 <body>
@@ -138,7 +145,21 @@
         <input type="date" id="target_date">
     </div>
 
-    <button class="save-btn" onclick="saveRisk()">Risk Analizini Kaydet (Canlı)</button>
+    <div class="photo-box">
+        <label>Kanıt Fotoğrafı (Offline destekli)</label>
+        <input type="file" id="risk_photo" accept="image/*" capture="environment" onchange="previewRiskPhoto()">
+        <img id="risk_photo_preview" class="photo-preview" alt="Seçilen risk fotoğrafı önizlemesi">
+        <div style="font-size:12px; color:var(--text-muted); margin-top:6px;">Fotoğraf internet yokken cihazda saklanır; bağlantı gelince Supabase Storage'a yüklenir.</div>
+    </div>
+
+    <div class="offline-panel">
+        <strong>Offline Durum:</strong> <span id="connection_status">Kontrol ediliyor...</span><br>
+        <strong>Cihazda bekleyen risk kaydı:</strong> <span id="pending_risk_count">0</span>
+        <div id="offline_status" style="margin-top:6px; color:var(--text-muted);">Henüz işlem yapılmadı.</div>
+        <button class="sync-btn" onclick="manualSyncRisks()">Bekleyenleri Şimdi Gönder</button>
+    </div>
+
+    <button class="save-btn" onclick="saveRisk()">Risk Analizini Kaydet</button>
     <div id="status"></div>
 
     <div class="table-container">
@@ -159,10 +180,13 @@
     </div>
 </div>
 
+<script src="offline-db.js"></script>
+<script src="sync-risks.js"></script>
 <script>
     const SUPABASE_URL = "https://dnvuizausfcjzkcsynql.supabase.co";
     const SUPABASE_KEY = "sb_publishable_LtrytF9wyS3u-KgSZk7heg_SZc7hhoY";
     const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    window.dbClient = dbClient;
 
     const themes = {
         isgm: { '--bg-main': '#f4f6f9', '--bg-card': '#ffffff', '--text-main': '#1e293b', '--text-muted': '#64748b', '--primary': '#2563eb', '--primary-hover': '#1d4ed8', '--accent-green': '#10b981', '--accent-green-hover': '#059669', '--border-color': '#e2e8f0', '--table-header': '#f8fafc', '--nav-inactive-bg': '#e2e8f0', '--nav-inactive-text': '#475569' },
@@ -188,6 +212,8 @@
         if (email.includes('hekim') || email.includes('admin')) document.getElementById('menu_medical').style.display = 'inline-block';
         
         calculateFineKinney(); await fetchCompaniesToSelect(); fetchRisks();
+        updateConnectionStatus(); updateOfflineRiskCount(); registerServiceWorker();
+        if (navigator.onLine && window.OSGBRiskSync) { window.OSGBRiskSync.syncPendingRisks(); }
     };
 
     function calculateFineKinney() {
@@ -235,13 +261,98 @@
         await dbClient.from('risk_assessments').update({ status: 'Kapalı' }).eq('id', id); fetchRisks();
     }
 
+    function makeLocalId() {
+        if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+        return 'local_' + Date.now() + '_' + Math.random().toString(16).slice(2);
+    }
+
+    function previewRiskPhoto() {
+        const fileInput = document.getElementById('risk_photo');
+        const preview = document.getElementById('risk_photo_preview');
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) { preview.style.display = 'none'; preview.src = ''; return; }
+        preview.src = URL.createObjectURL(file);
+        preview.style.display = 'block';
+    }
+
+    function updateConnectionStatus() {
+        const el = document.getElementById('connection_status');
+        if (!el) return;
+        if (navigator.onLine) { el.innerText = 'İnternet var'; el.style.color = 'var(--accent-green)'; }
+        else { el.innerText = 'İnternet yok - kayıtlar cihazda bekleyecek'; el.style.color = '#c2410c'; }
+    }
+
+    async function updateOfflineRiskCount() {
+        if (!window.OSGBOfflineDB) return;
+        const count = await window.OSGBOfflineDB.countPendingRisks();
+        document.getElementById('pending_risk_count').innerText = count;
+    }
+    window.updateOfflineRiskCount = updateOfflineRiskCount;
+
+    async function manualSyncRisks() {
+        updateConnectionStatus();
+        if (!navigator.onLine) { alert('Şu anda internet yok. Kayıtlar cihazda beklemeye devam edecek.'); return; }
+        if (window.OSGBRiskSync) await window.OSGBRiskSync.syncPendingRisks();
+    }
+
+    async function registerServiceWorker() {
+        if ('serviceWorker' in navigator) {
+            try { await navigator.serviceWorker.register('service-worker.js'); }
+            catch (err) { console.warn('Service worker kaydı yapılamadı:', err.message); }
+        }
+    }
+
+    window.addEventListener('online', function() { updateConnectionStatus(); manualSyncRisks(); });
+    window.addEventListener('offline', updateConnectionStatus);
+
     async function saveRisk() {
-        const compId = document.getElementById('company_select').value; const hazard = document.getElementById('hazard_title').value;
-        const o = parseFloat(document.getElementById('prob').value); const f = parseFloat(document.getElementById('freq').value); const s = parseFloat(document.getElementById('sev').value);
+        const compId = document.getElementById('company_select').value;
+        const hazard = document.getElementById('hazard_title').value;
+        const o = parseFloat(document.getElementById('prob').value);
+        const f = parseFloat(document.getElementById('freq').value);
+        const sev = parseFloat(document.getElementById('sev').value);
         const target = document.getElementById('target_date').value;
-        if(!compId || !hazard || !target) { alert("Lütfen tüm alanları doldurun!"); return; }
-        await dbClient.from('risk_assessments').insert([{ company_id: compId, hazard_title: hazard, probability_o: o, frequency_f: f, severity_s: s, risk_score: (o*f*s), target_date: target, status: 'Açık' }]);
-        document.getElementById('hazard_title').value = ''; document.getElementById('target_date').value = ''; fetchRisks();
+        const photoInput = document.getElementById('risk_photo');
+        const photoFile = photoInput.files && photoInput.files[0] ? photoInput.files[0] : null;
+
+        if(!compId || !hazard || !target) { alert("Lütfen firma, tehlike tanımı ve termin tarihini doldurun!"); return; }
+
+        const localRisk = {
+            local_id: makeLocalId(),
+            company_id: compId,
+            hazard_title: hazard,
+            probability_o: o,
+            frequency_f: f,
+            severity_s: sev,
+            risk_score: (o * f * sev),
+            target_date: target,
+            status: 'Açık',
+            photo_blob: photoFile,
+            photo_name: photoFile ? photoFile.name : null,
+            photo_type: photoFile ? photoFile.type : null,
+            sync_status: 'pending',
+            created_at: new Date().toISOString(),
+            created_offline: !navigator.onLine
+        };
+
+        await window.OSGBOfflineDB.saveRisk(localRisk);
+
+        document.getElementById('hazard_title').value = '';
+        document.getElementById('target_date').value = '';
+        document.getElementById('risk_photo').value = '';
+        document.getElementById('risk_photo_preview').style.display = 'none';
+        document.getElementById('risk_photo_preview').src = '';
+
+        document.getElementById('offline_status').style.color = navigator.onLine ? 'var(--text-muted)' : '#c2410c';
+        document.getElementById('offline_status').innerText = navigator.onLine
+            ? 'Kayıt önce cihaza alındı. Şimdi Supabase’e gönderilmeye çalışılıyor.'
+            : 'İnternet yok. Risk kaydı ve fotoğraf cihazda bekliyor.';
+
+        await updateOfflineRiskCount();
+
+        if (navigator.onLine && window.OSGBRiskSync) {
+            await window.OSGBRiskSync.syncPendingRisks();
+        }
     }
     async function handleLogout() { await dbClient.auth.signOut(); window.location.href = "login.html"; }
 </script>

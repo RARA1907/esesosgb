@@ -1,0 +1,9 @@
+{
+  "name": "AKAD OSGB SaaS",
+  "short_name": "OSGB SaaS",
+  "start_url": "risk.html",
+  "display": "standalone",
+  "background_color": "#f4f6f9",
+  "theme_color": "#2563eb",
+  "lang": "tr"
+}
