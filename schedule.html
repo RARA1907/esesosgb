@@ -60,7 +60,9 @@
         </div>
         <div class="form-group">
             <label>Gidecek Personel / Atama</label>
-            <input type="text" id="visit_staff" placeholder="Örn: Uzm. Ahmet Yılmaz">
+            <select id="visit_staff">
+                <option value="">Önce firma seçin...</option>
+            </select>
         </div>
         <div class="form-group">
             <label>Ziyaret Tarihi</label>
@@ -109,6 +111,10 @@
             <label>Yeni Süre (Dakika)</label>
             <input type="number" id="modal_visit_minutes">
         </div>
+        <div class="form-group">
+            <label>Personel Atamasını Değiştir</label>
+            <select id="modal_visit_staff"></select>
+        </div>
         
         <div class="modal-buttons">
             <button class="btn-update" onclick="updateTask()">Değişiklikleri Kaydet</button>
@@ -123,10 +129,12 @@
     const SUPABASE_KEY = "sb_publishable_LtrytF9wyS3u-KgSZk7heg_SZc7hhoY";
     const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     
-    // 🗓️ AY VE YIL DİNAMİK NAVİGASYON DEĞİŞKENLERİ
-    let currentDate = new Date(2026, 5, 1); // Varsayılan: Haziran 2026
+    let currentDate = new Date(2026, 5, 1); 
     const MONTH_NAMES = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
     const DAY_NAMES = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
+    
+    // Genel Havuz Personel Listesi
+    let globalStaffList = ["Uzm. Ahmet Yılmaz", "Dr. Mehmet Öz", "Uzm. Ayşe Demir", "Dr. Canan Dağ"];
 
     window.onload = async function() {
         const { data: { session } } = await dbClient.auth.getSession();
@@ -134,12 +142,27 @@
         document.body.style.display = "block";
         
         await fetchCompaniesToSelect();
+        populateStaffDropdowns(); // Personel listelerini doldur
         renderCalendarWithTasks();
     };
 
     async function changeMonth(direction) {
         currentDate.setMonth(currentDate.getMonth() + direction);
         renderCalendarWithTasks();
+    }
+
+    // Seçim kutularına personelleri yükleyen fonksiyon
+    function populateStaffDropdowns() {
+        const mainSelect = document.getElementById('visit_staff');
+        const modalSelect = document.getElementById('modal_visit_staff');
+        
+        let options = '<option value="">-- Personel Seçin --</option>';
+        globalStaffList.forEach(staff => {
+            options += `<option value="${staff}">${staff}</option>`;
+        });
+        
+        mainSelect.innerHTML = options;
+        modalSelect.innerHTML = options;
     }
 
     async function fetchCompaniesToSelect() {
@@ -167,11 +190,8 @@
 
         DAY_NAMES.forEach(d => { grid.innerHTML += `<div class="calendar-day-name">${d}</div>`; });
 
-        // Ayın ilk gününün haftanın hangi gününe denk geldiğini buluyoruz
         let firstDayIndex = new Date(year, month, 1).getDay() - 1;
-        if (firstDayIndex === -1) firstDayIndex = 6; // Pazar günü düzeltmesi
-        
-        // Ayda toplam kaç gün var?
+        if (firstDayIndex === -1) firstDayIndex = 6; 
         const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
 
         try {
@@ -179,14 +199,12 @@
             if(selectedCompanyId) { query = query.eq('company_id', selectedCompanyId); }
             const { data: schedules } = await query;
 
-            // Yasal Hedef Hesabı
             if(selectedCompanyId && schedules) {
                 const { data: comp } = await dbClient.from('customer_companies').select('danger_class').eq('id', selectedCompanyId).single();
                 const { count } = await dbClient.from('workers').select('*', { count: 'exact', head: true }).eq('company_id', selectedCompanyId);
                 let katsayi = comp.danger_class === 'Tehlikeli' ? 20 : (comp.danger_class === 'Çok Tehlikeli' ? 40 : 10);
                 let yasalGerekenDk = (count || 0) * katsayi;
                 
-                // Sadece görüntülenen aya ait planların sürelerini topluyoruz
                 let planlananToplamDk = schedules
                     .filter(s => new Date(s.visit_date).getMonth() === month && new Date(s.visit_date).getFullYear() === year)
                     .reduce((sum, s) => sum + s.planned_minutes, 0);
@@ -198,10 +216,8 @@
                 }
             }
 
-            // İlk günden önceki boş hücreleri basıyoruz
             for (let i = 0; i < firstDayIndex; i++) { grid.innerHTML += `<div class="calendar-cell calendar-cell-empty"></div>`; }
 
-            // Günleri tek tek döngüyle basıyoruz
             for (let day = 1; day <= totalDaysInMonth; day++) {
                 const dayString = `${year}-${(month+1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
                 const todaysTasks = (schedules || []).filter(s => s.visit_date === dayString);
@@ -219,12 +235,11 @@
                     const isComplete = totalFirmPlan >= yasalDk;
                     const staffName = task.assigned_staff ? task.assigned_staff : 'Atanmamış';
 
-                    // 🔗 TIKLANDIĞINDA MODAL PENCERESİNİ AÇAN EVENT EKLEDİK
                     taskHTML += `
                         <div class="task-badge ${isComplete ? 'task-complete' : 'task-incomplete'}" 
-                             onclick="openModal('${task.id}', '${task.visit_date}', '${task.planned_minutes}')"
+                             onclick="openModal('${task.id}', '${task.visit_date}', '${task.planned_minutes}', '${staffName}')"
                              title="${task.notes || ''}">
-                            🏢 ${task.customer_companies.company_name.substring(0,6)}.. <br>
+                            🏢 ${task.customer_companies.company_name.substring(0,5)}.. <br>
                             👤 ${staffName.substring(0,10)} <br>
                             ⏱️ ${task.planned_minutes} dk
                         </div>
@@ -241,27 +256,33 @@
         } catch (err) { console.error(err.message); }
     }
 
-    // 🔔 MODAL İŞLEMLERİ FONKSİYONLARI
-    function openModal(id, date, minutes) {
+    // 🔔 MODAL AÇILIRKEN MEVCUT PERSONELİ SEÇİLİ GETİRİYORUZ
+    function openModal(id, date, minutes, staff) {
         document.getElementById('modal_task_id').value = id;
         document.getElementById('modal_visit_date').value = date;
         document.getElementById('modal_visit_minutes').value = minutes;
+        document.getElementById('modal_visit_staff').value = staff; // Kayıtlı personeli getir
         document.getElementById('taskModal').style.display = 'flex';
     }
     function closeModal() { document.getElementById('taskModal').style.display = 'none'; }
 
-    // PLAN GÜNCELLEME (UPDATE)
+    // PLAN GÜNCELLEME (ARTIK PERSONEL DEĞİŞİMİNİ DE DESTEKLİYOR)
     async function updateTask() {
         const id = document.getElementById('modal_task_id').value;
         const newDate = document.getElementById('modal_visit_date').value;
         const newMins = parseInt(document.getElementById('modal_visit_minutes').value);
+        const newStaff = document.getElementById('modal_visit_staff').value; // Yeni personel seçimi
 
-        const { error } = await dbClient.from('field_schedules').update({ visit_date: newDate, planned_minutes: newMins }).eq('id', id);
+        const { error } = await dbClient.from('field_schedules').update({ 
+            visit_date: newDate, 
+            planned_minutes: newMins,
+            assigned_staff: newStaff 
+        }).eq('id', id);
+        
         if (error) alert("Hata: " + error.message);
         else { closeModal(); renderCalendarWithTasks(); }
     }
 
-    // PLAN SİLME (DELETE)
     async function deleteTask() {
         if(!confirm("Bu saha ziyaret planını tamamen silmek istediğinize emin misiniz?")) return;
         const id = document.getElementById('modal_task_id').value;
@@ -273,13 +294,13 @@
 
     async function saveSchedule() {
         const compId = document.getElementById('company_select').value;
-        const staff = document.getElementById('visit_staff').value;
+        const staff = document.getElementById('visit_staff').value; // Seçim kutusundan veri alma
         const date = document.getElementById('visit_date').value;
         const mins = document.getElementById('visit_minutes').value;
         const notes = document.getElementById('visit_notes').value;
         const statusDiv = document.getElementById('status');
 
-        if(!compId || !date || !mins || !staff) { statusDiv.style.color = "red"; statusDiv.innerText = "Lütfen Atama dahil tüm alanları doldurun!"; return; }
+        if(!compId || !date || !mins || !staff) { statusDiv.style.color = "red"; statusDiv.innerText = "Lütfen Personel dahil tüm alanları seçin!"; return; }
         statusDiv.style.color = "blue"; statusDiv.innerText = "Plan takvime işleniyor...";
 
         const { error } = await dbClient.from('field_schedules').insert([{
@@ -295,6 +316,7 @@
             statusDiv.style.color = "green"; statusDiv.innerText = "🚀 Ziyaret planı başarıyla eklendi!";
             document.getElementById('visit_minutes').value = '';
             document.getElementById('visit_notes').value = '';
+            document.getElementById('visit_staff').value = '';
             renderCalendarWithTasks();
         }
     }
