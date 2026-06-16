@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSGB SaaS - Merkezi Aksiyon Havuzu</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f9; padding: 30px; display: none; }
+        .card { background: white; padding: 25px; border-radius: 12px; max-width: 1050px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .back-btn { background: #1e293b; color: white; border: none; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 13px; }
+        .back-btn:hover { background: #0f172a; }
+        
+        .grid-sections { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; margin-top: 25px; }
+        .panel { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
+        .panel-title { margin-top: 0; padding-bottom: 8px; border-bottom: 2px solid #ef4444; color: #b91c1c; display: flex; justify-content: space-between; align-items: center; }
+        .panel-title-blue { border-bottom: 2px solid #2563eb; color: #1d4ed8; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 12px; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+        th { background-color: #f8fafc; color: #475569; font-weight: 600; }
+        
+        .badge { padding: 3px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; }
+        .badge-danger { background: #fee2e2; color: #b91c1c; }
+        .badge-warning { background: #ffedd5; color: #c2410c; }
+        
+        .overdue-row { background-color: #fff5f5; }
+        .close-action-btn { background: #10b981; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; cursor: pointer; }
+        .close-action-btn:hover { background: #059669; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <a href="dashboard.html" class="back-btn">← Yönetim Paneline Dön</a>
+        <span style="font-size: 14px; font-weight: bold; color: #ef4444;">🚨 MERKEZİ GÖREV, TERMİN VE AKSİYON HAVUZU</span>
+    </div>
+
+    <div class="grid-sections">
+        
+        <!-- SOL PANEL: TÜM SİSTEMDEKİ AÇIK RİSKLER -->
+        <div class="panel">
+            <h3 class="panel-title">🚨 Giderilmeyi Bekleyen Açık Riskler ve Yasal Terminler <span id="cnt_open_risks" class="badge badge-danger">0</span></h3>
+            <p style="color: #64748b; font-size: 12px; margin: 5px 0;">Süresi geçmiş veya yaklaşan yasal aksiyonlar burada listelenir. Sahada çözüldükçe kapatabilirsiniz.</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Müşteri Firma</th>
+                        <th>Bulgu / Tehlike Tanımı</th>
+                        <th>Risk Skoru</th>
+                        <th>Hedef Termin</th>
+                        <th>İşlem</th>
+                    </tr>
+                </thead>
+                <tbody id="all_open_risks_tbody">
+                    <tr><td colspan="5" style="text-align:center; color:#94a3b8;">Veriler taranıyor...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- SAĞ PANEL: YAKLAŞAN SAHA ZİYARETLERİ -->
+        <div class="panel">
+            <h3 class="panel-title panel-title-blue">📅 Bu Ayki Saha Ziyaret Programı Takibi <span id="cnt_visits" class="badge" style="background:#dbeafe; color:#1d4ed8;">0</span></h3>
+            <p style="color: #64748b; font-size: 12px; margin: 5px 0;">Uzman ve hekimlerin bu ay yapacağı saha denetimleri planı.</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tarih</th>
+                        <th>Firma</th>
+                        <th>Sorumlu Personel</th>
+                        <th>Planlanan Süre</th>
+                    </tr>
+                </thead>
+                <tbody id="current_visits_tbody">
+                    <tr><td colspan="4" style="text-align:center; color:#94a3b8;">Ziyaret planları listeleniyor...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    const SUPABASE_URL = "https://dnvuizausfcjzkcsynql.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_LtrytF9wyS3u-KgSZk7heg_SZc7hhoY";
+    const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    window.onload = async function() {
+        const { data: { session } } = await dbClient.auth.getSession();
+        if (!session) { window.location.href = "login.html"; return; }
+        document.body.style.display = "block";
+
+        fetchGlobalOpenRisks();
+        fetchGlobalVisits();
+    };
+
+    async function fetchGlobalOpenRisks() {
+        const tbody = document.getElementById('all_open_risks_tbody');
+        const { data } = await dbClient.from('risk_assessments').select('*, customer_companies(company_name)').eq('status', 'Açık').order('target_date', { ascending: true });
+        
+        if (!data || data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#16a34a; font-weight:bold;">✓ Harika! Sistemde bekleyen açık risk veya bulgu yok.</td></tr>`;
+            document.getElementById('cnt_open_risks').innerText = "0";
+            return;
+        }
+
+        document.getElementById('cnt_open_risks').innerText = data.length;
+        tbody.innerHTML = '';
+        
+        const bugun = new Date("2026-06-16");
+
+        data.forEach(r => {
+            const terminTarihi = new Date(r.target_date);
+            const gecikmişMi = terminTarihi < bugun;
+            const rowClass = gecikmişMi ? 'overdue-row' : '';
+            const compName = r.customer_companies ? r.customer_companies.company_name : 'Bilinmeyen Sirket';
+            
+            tbody.innerHTML += `
+                <tr class="${rowClass}">
+                    <td><strong>${compName}</strong></td>
+                    <td>${r.hazard_title}</td>
+                    <td style="color:#b91c1c; font-weight:bold;">⚠️ ${r.risk_score}</td>
+                    <td>${gecikmişMi ? `<span style="color:red; font-weight:bold;">🚨 Gecikti (${r.target_date})</span>` : r.target_date}</td>
+                    <td><button class="close-action-btn" onclick="closeRiskFromHavuz('${r.id}')">Giderildi</button></td>
+                </tr>
+            `;
+        });
+    }
+
+    async function closeRiskFromHavuz(id) {
+        if(!confirm("Bu bulgunun giderildiğini ve yasal olarak kapatıldığını onaylıyor musunuz?")) return;
+        await dbClient.from('risk_assessments').update({ status: 'Kapalı' }).eq('id', id);
+        fetchGlobalOpenRisks();
+    }
+
+    async function fetchGlobalVisits() {
+        const tbody = document.getElementById('current_visits_tbody');
+        const { data } = await dbClient.from('field_schedules').select('*, customer_companies(company_name)').order('visit_date', { ascending: true });
+        
+        if (!data || data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#64748b;">Bu ay için planlanmış ziyaret yok.</td></tr>`;
+            document.getElementById('cnt_visits').innerText = "0";
+            return;
+        }
+
+        document.getElementById('cnt_visits').innerText = data.length;
+        tbody.innerHTML = '';
+        data.forEach(v => {
+            const compName = v.customer_companies ? v.customer_companies.company_name : 'Bilinmeyen Sirket';
+            tbody.innerHTML += `<tr><td>📅 ${v.visit_date}</td><td><strong>${compName}</strong></td><td>👤 ${v.assigned_staff || 'Atanmamış'}</td><td>⏱️ ${v.planned_minutes} Dk</td></tr>`;
+        });
+    }
+</script>
+</body>
+</html>
