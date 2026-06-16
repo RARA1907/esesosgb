@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f9; padding: 30px; display: none; }
-        .card { background: white; padding: 25px; border-radius: 12px; max-width: 1000px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .card { background: white; padding: 25px; border-radius: 12px; max-width: 1050px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
         h2 { color: #1e293b; margin-top: 0; }
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; color: #64748b; font-weight: 600; font-size: 13px; }
@@ -26,6 +26,20 @@
         .badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; display: inline-block; }
         .badge-active { background: #dcfce7; color: #15803d; }
         .badge-passive { background: #fee2e2; color: #b91c1c; }
+
+        .btn-edit-action { background: #2563eb; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; margin-right: 5px; }
+        .btn-edit-action:hover { background: #1d4ed8; }
+        .btn-delete-action { background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; }
+        .btn-delete-action:hover { background: #b91c1c; }
+
+        /* 🔔 MODAL (DÜZENLEME PENCERESİ) */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 100; justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 25px; border-radius: 12px; width: 500px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); max-height: 90vh; overflow-y: auto; }
+        .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-update { background: #10b981; color: white; border: none; padding: 12px; border-radius: 6px; flex: 1; font-weight: bold; cursor: pointer; font-size: 14px; }
+        .btn-update:hover { background: #059669; }
+        .btn-close { background: #64748b; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+        .btn-close:hover { background: #475569; }
     </style>
 </head>
 <body>
@@ -42,7 +56,7 @@
         </div>
         <div class="form-group">
             <label>Sistem Rolü</label>
-            <select id="staff_role" onchange="toggleCertClass()">
+            <select id="staff_role" onchange="toggleCertClass('staff_role', 'certificate_class')">
                 <option value="Uzman">Uzman (İSG)</option>
                 <option value="Hekim">Hekim</option>
                 <option value="DSP">DSP (Diğer Sağlık Personeli)</option>
@@ -95,7 +109,7 @@
                     <th>E-Posta</th>
                     <th>Giriş / Çıkış Tarihi</th>
                     <th style="text-align: center;">Erişim Durumu</th>
-                    <th>Aksiyon</th>
+                    <th>Aksiyonler</th>
                 </tr>
             </thead>
             <tbody id="staff_table_body">
@@ -109,12 +123,73 @@
     <a href="index.html" class="nav-link">← Ana Yönetim Paneline Dön</a>
 </div>
 
+<!-- 🔔 YENİ EKLENEN PERSONEL DÜZENLEME PENCERESİ (MODAL) -->
+<div id="staffModal" class="modal">
+    <div class="modal-content">
+        <h3 style="margin-top:0; color:#1e293b; border-bottom:2px solid #ec4899; padding-bottom:8px;">📝 Personel Kartını Güncelle</h3>
+        <input type="hidden" id="modal_staff_id">
+        
+        <div class="form-group">
+            <label>Personel Adı Soyadı</label>
+            <input type="text" id="modal_staff_name">
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <div class="form-group">
+                <label>Sistem Rolü</label>
+                <select id="modal_staff_role" onchange="toggleCertClass('modal_staff_role', 'modal_certificate_class')">
+                    <option value="Uzman">Uzman (İSG)</option>
+                    <option value="Hekim">Hekim</option>
+                    <option value="DSP">DSP (Diğer Sağlık Personeli)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Uzmanlık Sınıfı</label>
+                <select id="modal_certificate_class">
+                    <option value="Yok">Yok (Hekim/DSP)</option>
+                    <option value="A Sınıfı">A Sınıfı</option>
+                    <option value="B Sınıfı">B Sınıfı</option>
+                    <option value="C Sınıfı">C Sınıfı</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Kurumsal E-Posta</label>
+            <input type="email" id="modal_staff_email">
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <div class="form-group">
+                <label>İşe Giriş Tarihi</label>
+                <input type="date" id="modal_hire_date">
+            </div>
+            <div class="form-group">
+                <label>İşten Çıkış Tarihi</label>
+                <input type="date" id="modal_termination_date">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Manuel Durum Kilidi</label>
+            <select id="modal_is_active_manual">
+                <option value="Aktif">Aktif (Sistem Açık)</option>
+                <option value="Pasif">Pasif (Giriş Engellensin)</option>
+            </select>
+        </div>
+        
+        <div class="modal-buttons">
+            <button class="btn-update" onclick="updateStaff()">Değişiklikleri Veritabanına İşle</button>
+            <button class="btn-close" onclick="closeModal()">İptal Et</button>
+        </div>
+    </div>
+</div>
+
 <script>
     const SUPABASE_URL = "https://dnvuizausfcjzkcsynql.supabase.co";
     const SUPABASE_KEY = "sb_publishable_LtrytF9wyS3u-KgSZk7heg_SZc7hhoY";
     const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // 🗓️ 2026 GÜNCEL ZAMAN SABİTİ
     const TODAY_STR = "2026-06-16";
     const todayDate = new Date(TODAY_STR);
 
@@ -123,42 +198,35 @@
         if (!session) { window.location.href = "login.html"; return; }
         document.body.style.display = "block";
         
-        // Giriş tarihine varsayılan olarak bugünü atayalım kolaylık olsun
         document.getElementById('hire_date').value = TODAY_STR;
-        
         fetchStaff();
     };
 
-    function toggleCertClass() {
-        const role = document.getElementById('staff_role').value;
-        const certSelect = document.getElementById('certificate_class');
+    function toggleCertClass(roleId, certId) {
+        const role = document.getElementById(roleId).value;
+        const certSelect = document.getElementById(certId);
         if (role !== 'Uzman') {
             certSelect.value = 'Yok';
             certSelect.disabled = true;
         } else {
             certSelect.disabled = false;
-            certSelect.value = 'C Sınıfı';
+            if(certSelect.value === 'Yok') certSelect.value = 'C Sınıfı';
         }
     }
 
-    // 🧠 DİNAMİK AKTİFLİK DURUMUNU HESAPLAYAN AKILLI MOTOR
     function calculateSystemStatus(hireStr, termStr, manualStatus) {
-        if (manualStatus === 'Pasif') return false; // Yönetici manuel kilitlediyse direkt pasif
-        if (!hireStr) return false; // İşe giriş tarihi yoksa geçersiz
+        if (manualStatus === 'Pasif') return false; 
+        if (!hireStr) return false; 
 
         const hire = new Date(hireStr);
-        
-        // Giriş tarihi henüz gelmediyse pasif
         if (hire > todayDate) return false;
 
-        // Çıkış tarihi girilmişse kontrol et
         if (termStr) {
             const term = new Date(termStr);
-            // Eğer işten çıkış tarihi geçmişte kalmışsa pasif
             if (term <= todayDate) return false;
         }
 
-        return true; // Tüm yasal bariyerleri geçtiyse AKTİF
+        return true; 
     }
 
     async function fetchStaff() {
@@ -171,9 +239,13 @@
             }
             tbody.innerHTML = '';
             data.forEach(s => {
-                // Canlı aktiflik kontrolünü çalıştırıyoruz
                 const isSystemActive = calculateSystemStatus(s.hire_date, s.termination_date, s.is_active_manual);
                 
+                // Güvenli string kaçışları (Modal'a hatasız veri paslamak için)
+                const safeName = (s.name_surname || '').replace(/'/g, "\\'");
+                const safeEmail = (s.email || '').replace(/'/g, "\\'");
+                const safeTerm = s.termination_date || '';
+
                 tbody.innerHTML += `
                     <tr>
                         <td><strong>🏢 ${s.name_surname}</strong></td>
@@ -185,11 +257,64 @@
                                 ${isSystemActive ? '● AKTİF (Girebilir)' : '○ PASİF (Bloke)'}
                             </span>
                         </td>
-                        <td><button onclick="deleteStaff('${s.id}')" style="background:none; border:none; color:#ef4444; cursor:pointer; font-weight:bold; font-size:12px;">Kadro Dışı Bırak</button></td>
+                        <!-- DÜZENLE VE SİL BUTONLARI ARTIK YAN YANA -->
+                        <td>
+                            <button class="btn-edit-action" onclick="openStaffModal('${s.id}', '${safeName}', '${s.staff_role}', '${s.certificate_class}', '${safeEmail}', '${s.hire_date}', '${safeTerm}', '${s.is_active_manual}')">Düzenle</button>
+                            <button class="btn-delete-action" onclick="deleteStaff('${s.id}')">Sil</button>
+                        </td>
                     </tr>
                 `;
             });
         } catch (err) { console.error(err.message); }
+    }
+
+    // 🔑 DÜZENLEME MODALINI AÇAN VE VERİLERİ DOLDURAN AKILLI HÜCRE FONKSİYONU
+    function openStaffModal(id, name, role, cert, email, hire, term, manual) {
+        document.getElementById('modal_staff_id').value = id;
+        document.getElementById('modal_staff_name').value = name;
+        document.getElementById('modal_staff_role').value = role;
+        document.getElementById('modal_certificate_class').value = cert;
+        document.getElementById('modal_staff_email').value = email;
+        document.getElementById('modal_hire_date').value = hire;
+        document.getElementById('modal_termination_date').value = term;
+        document.getElementById('modal_is_active_manual').value = manual;
+
+        // Rol durumuna göre sınıf seçim kutusunu kilitle/aç kontrolünü tetikliyoruz
+        toggleCertClass('modal_staff_role', 'modal_certificate_class');
+
+        document.getElementById('staffModal').style.display = 'flex';
+    }
+
+    function closeModal() { document.getElementById('staffModal').style.display = 'none'; }
+
+    // 🧠 VERİLERİ BULUTTA GÜNCELLEYEN OPERASYON FONKSİYONU
+    async function updateStaff() {
+        const id = document.getElementById('modal_staff_id').value;
+        const name = document.getElementById('modal_staff_name').value;
+        const role = document.getElementById('modal_staff_role').value;
+        const cert = document.getElementById('modal_certificate_class').value;
+        const email = document.getElementById('modal_staff_email').value;
+        const hire = document.getElementById('modal_hire_date').value;
+        const term = document.getElementById('modal_termination_date').value || null;
+        const manual = document.getElementById('modal_is_active_manual').value;
+
+        if(!name || !email || !hire) { alert("Lütfen İsim, E-Posta ve Giriş Tarihi alanlarını boş bırakmayın!"); return; }
+
+        const { error } = await dbClient.from('osgb_staff').update({
+            name_surname: name,
+            staff_role: role,
+            certificate_class: cert,
+            email: email,
+            hire_date: hire,
+            termination_date: term,
+            is_active_manual: manual
+        }).eq('id', id);
+
+        if (error) { alert("Güncelleme Hatası: " + error.message); }
+        else {
+            closeModal();
+            fetchStaff(); // Listeyi anlık olarak yenile ve durumları yeniden hesapla
+        }
     }
 
     async function saveStaff() {
@@ -202,7 +327,7 @@
         const manual = document.getElementById('is_active_manual').value;
         const statusDiv = document.getElementById('status');
 
-        if(!name || !email || !hire) { statusDiv.style.color = "red"; statusDiv.innerText = "Lütfen İsim, E-Posta and Giriş Tarihi alanlarını doldurun!"; return; }
+        if(!name || !email || !hire) { statusDiv.style.color = "red"; statusDiv.innerText = "Lütfen İsim, E-Posta ve Giriş Tarihi alanlarını doldurun!"; return; }
         statusDiv.style.color = "blue"; statusDiv.innerText = "Veri tabanına işleniyor...";
 
         const { error } = await dbClient.from('osgb_staff').insert([{ 
