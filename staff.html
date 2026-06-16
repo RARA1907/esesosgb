@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSGB SaaS - Kullanıcı & Personel Yönetimi</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f9; padding: 30px; display: none; }
+        .card { background: white; padding: 25px; border-radius: 12px; max-width: 750px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        h2 { color: #1e293b; margin-top: 0; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; color: #64748b; font-weight: 600; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; }
+        .grid-3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; margin-bottom: 15px; }
+        button.submit-btn { background: #ec4899; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; margin-top: 10px; }
+        button.submit-btn:hover { background: #db2777; }
+        .nav-link { display: block; text-align: center; margin-top: 15px; color: #64748b; text-decoration: none; font-size: 14px; }
+        #status { margin-top: 15px; text-align: center; font-weight: bold; }
+
+        .table-container { margin-top: 35px; border-top: 2px solid #e2e8f0; padding-top: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th { background-color: #f8fafc; color: #475569; font-weight: 600; }
+        .badge-role { padding: 3px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>🔑 OSGB Kullanıcı & Personel Tanımlama Paneli</h2>
+    <p style="color: #64748b; font-size: 14px;">OSGB bünyesindeki aktif uzmanları, hekimleri ve onların kurumsal rollerini buradan yönetin.</p>
+    
+    <div class="grid-3">
+        <div class="form-group">
+            <label>Personel Adı Soyadı</label>
+            <input type="text" id="staff_name" placeholder="Örn: Orhan Vardar">
+        </div>
+        <div class="form-group">
+            <label>Sistem Rolü</label>
+            <select id="staff_role">
+                <option value="Uzman">Uzman (İSG)</option>
+                <option value="Hekim">Hekim (İSGM)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>E-Posta Adresi</label>
+            <input type="email" id="staff_email" placeholder="isim@osgb.com">
+        </div>
+    </div>
+
+    <button class="submit-btn" onclick="saveStaff()">Yeni Personel Hesabı Tanımla</button>
+    <div id="status"></div>
+
+    <div class="table-container">
+        <h3>📋 OSGB Resmi Personel Kadrosu (Canlı)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Adı Soyadı</th>
+                    <th>Kurumsal E-Posta</th>
+                    <th>Yetki / Rolü</th>
+                    <th>Aksiyon</th>
+                </tr>
+            </thead>
+            <tbody id="staff_table_body">
+                <tr>
+                    <td colspan="4" style="text-align:center; color:#94a3b8;">Yükleniyor...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <a href="index.html" class="nav-link">← Ana Yönetim Paneline Dön</a>
+</div>
+
+<script>
+    const SUPABASE_URL = "https://dnvuizausfcjzkcsynql.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_LtrytF9wyS3u-KgSZk7heg_SZc7hhoY";
+    const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    window.onload = async function() {
+        const { data: { session } } = await dbClient.auth.getSession();
+        if (!session) { window.location.href = "login.html"; return; }
+        document.body.style.display = "block";
+        fetchStaff();
+    };
+
+    async function fetchStaff() {
+        const tbody = document.getElementById('staff_table_body');
+        try {
+            const { data } = await dbClient.from('osgb_staff').select('*').order('created_at', { ascending: false });
+            if (!data || data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#94a3b8;">Sistemde henüz tanımlı uzman veya hekim bulunmuyor.</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = '';
+            data.forEach(s => {
+                let isUzman = s.staff_role === 'Uzman';
+                let bColor = isUzman ? '#e0f2fe' : '#dcfce7';
+                let tColor = isUzman ? '#0369a1' : '#15803d';
+                
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>${s.name_surname}</strong></td>
+                        <td>${s.email || '-'}</td>
+                        <td><span class="badge-role" style="background:${bColor}; color:${tColor};">${s.staff_role}</span></td>
+                        <td><button onclick="deleteStaff('${s.id}')" style="background:none; border:none; color:#ef4444; cursor:pointer; font-weight:bold;">Sil</button></td>
+                    </tr>
+                `;
+            });
+        } catch (err) { console.error(err.message); }
+    }
+
+    async function saveStaff() {
+        const name = document.getElementById('staff_name').value;
+        const role = document.getElementById('staff_role').value;
+        const email = document.getElementById('staff_email').value;
+        const statusDiv = document.getElementById('status');
+
+        if(!name || !email) { statusDiv.style.color = "red"; statusDiv.innerText = "Lütfen alanları eksiksiz doldurun!"; return; }
+        statusDiv.style.color = "blue"; statusDiv.innerText = "Kadrosu onaylanıyor...";
+
+        const { error } = await dbClient.from('osgb_staff').insert([{ name_surname: name, staff_role: role, email: email }]);
+
+        if (error) { statusDiv.style.color = "red"; statusDiv.innerText = "Hata: " + error.message; }
+        else {
+            statusDiv.style.color = "green"; statusDiv.innerText = "🚀 Personel başarıyla tanımlandı ve yetkilendirildi!";
+            document.getElementById('staff_name').value = '';
+            document.getElementById('staff_email').value = '';
+            fetchStaff();
+        }
+    }
+
+    async function deleteStaff(id) {
+        if(!confirm("Bu personeli kadrodan çıkarmak istediğinize emin misiniz?")) return;
+        await dbClient.from('osgb_staff').delete().eq('id', id);
+        fetchStaff();
+    }
+</script>
+</body>
+</html>
