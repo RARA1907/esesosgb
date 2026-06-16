@@ -61,7 +61,7 @@
         <div class="form-group">
             <label>Gidecek Personel / Atama</label>
             <select id="visit_staff">
-                <option value="">Önce firma seçin...</option>
+                <option value="">Personeller yükleniyor...</option>
             </select>
         </div>
         <div class="form-group">
@@ -129,12 +129,9 @@
     const SUPABASE_KEY = "sb_publishable_LtrytF9wyS3u-KgSZk7heg_SZc7hhoY";
     const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     
-    let currentDate = new Date(2026, 5, 1); 
+    let currentDate = new Date(2026, 5, 1); // Başlangıç: Haziran 2026
     const MONTH_NAMES = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
     const DAY_NAMES = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
-    
-    // Genel Havuz Personel Listesi
-    let globalStaffList = ["Uzm. Ahmet Yılmaz", "Dr. Mehmet Öz", "Uzm. Ayşe Demir", "Dr. Canan Dağ"];
 
     window.onload = async function() {
         const { data: { session } } = await dbClient.auth.getSession();
@@ -142,7 +139,7 @@
         document.body.style.display = "block";
         
         await fetchCompaniesToSelect();
-        populateStaffDropdowns(); // Personel listelerini doldur
+        await populateStaffDropdowns(); // Personel listesini Supabase'den canlı çek
         renderCalendarWithTasks();
     };
 
@@ -151,18 +148,27 @@
         renderCalendarWithTasks();
     }
 
-    // Seçim kutularına personelleri yükleyen fonksiyon
-    function populateStaffDropdowns() {
+    // 🧠 RESMİ KADROYU VERİTABANINDAN CANLI ÇEKEN VE DROPDOWN'LARA KOYAN MOTOR
+    async function populateStaffDropdowns() {
         const mainSelect = document.getElementById('visit_staff');
         const modalSelect = document.getElementById('modal_visit_staff');
         
-        let options = '<option value="">-- Personel Seçin --</option>';
-        globalStaffList.forEach(staff => {
-            options += `<option value="${staff}">${staff}</option>`;
-        });
-        
-        mainSelect.innerHTML = options;
-        modalSelect.innerHTML = options;
+        try {
+            const { data } = await dbClient.from('osgb_staff').select('name_surname, staff_role').order('name_surname');
+            
+            let options = '<option value="">-- Personel Seçin --</option>';
+            if (data && data.length > 0) {
+                data.forEach(s => {
+                    const formattedValue = `${s.name_surname} (${s.staff_role})`;
+                    options += `<option value="${formattedValue}">${formattedValue}</option>`;
+                });
+            } else {
+                options = '<option value="">Sistemde kayıtlı personel yok!</option>';
+            }
+            
+            mainSelect.innerHTML = options;
+            modalSelect.innerHTML = options;
+        } catch (err) { console.error("Personel listeleme hatası:", err.message); }
     }
 
     async function fetchCompaniesToSelect() {
@@ -240,7 +246,7 @@
                              onclick="openModal('${task.id}', '${task.visit_date}', '${task.planned_minutes}', '${staffName}')"
                              title="${task.notes || ''}">
                             🏢 ${task.customer_companies.company_name.substring(0,5)}.. <br>
-                            👤 ${staffName.substring(0,10)} <br>
+                            👤 ${staffName.substring(0,12)} <br>
                             ⏱️ ${task.planned_minutes} dk
                         </div>
                     `;
@@ -256,7 +262,6 @@
         } catch (err) { console.error(err.message); }
     }
 
-    // 🔔 MODAL AÇILIRKEN MEVCUT PERSONELİ SEÇİLİ GETİRİYORUZ
     function openModal(id, date, minutes, staff) {
         document.getElementById('modal_task_id').value = id;
         document.getElementById('modal_visit_date').value = date;
@@ -266,12 +271,12 @@
     }
     function closeModal() { document.getElementById('taskModal').style.display = 'none'; }
 
-    // PLAN GÜNCELLEME (ARTIK PERSONEL DEĞİŞİMİNİ DE DESTEKLİYOR)
+    // PLAN GÜNCELLEME (PERSONEL DEĞİŞİMİ DAHİL)
     async function updateTask() {
         const id = document.getElementById('modal_task_id').value;
         const newDate = document.getElementById('modal_visit_date').value;
         const newMins = parseInt(document.getElementById('modal_visit_minutes').value);
-        const newStaff = document.getElementById('modal_visit_staff').value; // Yeni personel seçimi
+        const newStaff = document.getElementById('modal_visit_staff').value;
 
         const { error } = await dbClient.from('field_schedules').update({ 
             visit_date: newDate, 
@@ -294,13 +299,13 @@
 
     async function saveSchedule() {
         const compId = document.getElementById('company_select').value;
-        const staff = document.getElementById('visit_staff').value; // Seçim kutusundan veri alma
+        const staff = document.getElementById('visit_staff').value; 
         const date = document.getElementById('visit_date').value;
         const mins = document.getElementById('visit_minutes').value;
         const notes = document.getElementById('visit_notes').value;
         const statusDiv = document.getElementById('status');
 
-        if(!compId || !date || !mins || !staff) { statusDiv.style.color = "red"; statusDiv.innerText = "Lütfen Personel dahil tüm alanları seçin!"; return; }
+        if(!compId || !date || !mins || !staff) { statusDiv.style.color = "red"; statusDiv.innerText = "Lütfen tüm alanları eksiksiz seçin!"; return; }
         statusDiv.style.color = "blue"; statusDiv.innerText = "Plan takvime işleniyor...";
 
         const { error } = await dbClient.from('field_schedules').insert([{
