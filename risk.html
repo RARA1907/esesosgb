@@ -70,7 +70,7 @@
         #company_cache_status { font-size: 12px; color: var(--text-muted); }
         .template-panel { background: var(--table-header); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin: 12px 0 15px 0; }
         .template-panel-title { font-weight: 700; color: var(--text-main); margin-bottom: 8px; font-size: 13px; }
-        .template-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+        .template-row { display: grid; grid-template-columns: 1fr 1.6fr auto; gap: 10px; align-items: end; }
         .template-apply-btn { background: var(--primary); color: white; border: none; padding: 10px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; white-space: nowrap; }
         .template-apply-btn:hover { background: var(--primary-hover); }
         #template_status { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
@@ -115,17 +115,39 @@
     </div>
 
     <div class="template-panel">
-        <div class="template-panel-title">⚡ NACE / Tehlike Sınıfı Hazır Risk Şablonları</div>
+        <div class="template-panel-title">⚡ Kategorili Hazır Risk Şablonları</div>
         <div class="template-row">
+            <div>
+                <label>Kategori Seç</label>
+                <select id="risk_template_category" onchange="updateRiskTemplateOptions(true)">
+                    <option value="auto">Firma/NACE Önerileri</option>
+                    <option value="general">Genel İşyeri</option>
+                    <option value="construction">İnşaat / Şantiye</option>
+                    <option value="warehouse">Depo / Lojistik</option>
+                    <option value="office">Ofis</option>
+                    <option value="school">Okul / Eğitim Kurumu</option>
+                    <option value="healthcare">Sağlık Kurumu</option>
+                    <option value="kitchen">Restoran / Mutfak</option>
+                    <option value="manufacturing">Üretim / Atölye</option>
+                    <option value="chemical">Kimyasal Çalışma</option>
+                    <option value="electrical">Elektrik İşleri</option>
+                    <option value="height">Yüksekte Çalışma</option>
+                    <option value="confined">Kapalı Alan</option>
+                    <option value="fire">Yangın / Acil Durum</option>
+                    <option value="ergonomics">Ergonomi</option>
+                    <option value="hygiene">Temizlik / Hijyen</option>
+                    <option value="physical">Gürültü / Toz / Titreşim</option>
+                </select>
+            </div>
             <div>
                 <label>Hazır Şablon Seç</label>
                 <select id="risk_template_select">
-                    <option value="">Önce firma seçin...</option>
+                    <option value="">Önce firma veya kategori seçin...</option>
                 </select>
             </div>
             <button type="button" class="template-apply-btn" onclick="applyRiskTemplate()">Şablonu Uygula</button>
         </div>
-        <div id="template_status">Seçilen firmanın NACE kodu ve tehlike sınıfına göre öneriler listelenir. Offline modda da çalışır.</div>
+        <div id="template_status">Firma/NACE önerilerini kullanabilir veya kategori seçerek tüm yerel şablonları görüntüleyebilirsiniz. Offline modda da çalışır.</div>
     </div>
 
     <div class="form-group">
@@ -241,67 +263,86 @@
     window.dbClient = dbClient;
 
 
+    const TEMPLATE_CATEGORY_LABELS = {
+        auto: 'Firma/NACE Önerileri',
+        general: 'Genel İşyeri',
+        construction: 'İnşaat / Şantiye',
+        warehouse: 'Depo / Lojistik',
+        office: 'Ofis',
+        school: 'Okul / Eğitim Kurumu',
+        healthcare: 'Sağlık Kurumu',
+        kitchen: 'Restoran / Mutfak',
+        manufacturing: 'Üretim / Atölye',
+        chemical: 'Kimyasal Çalışma',
+        electrical: 'Elektrik İşleri',
+        height: 'Yüksekte Çalışma',
+        confined: 'Kapalı Alan',
+        fire: 'Yangın / Acil Durum',
+        ergonomics: 'Ergonomi',
+        hygiene: 'Temizlik / Hijyen',
+        physical: 'Gürültü / Toz / Titreşim'
+    };
+
     const RISK_TEMPLATE_LIBRARY = [
-        {
-            code: 'GEN-001', tags: ['all'], title: 'Elektrik panosunda uygunsuzluk',
-            hazard: 'Elektrik panosu kapağı, uyarı etiketi, kaçak akım rölesi veya pano içi düzeninde uygunsuzluk tespit edildi.',
-            action: 'Elektrik panosu yetkili elektrik personeli tarafından kontrol edilecek; eksik uyarı levhaları tamamlanacak, kaçak akım rölesi ve pano içi düzen mevzuata uygun hale getirilecek.',
-            o: 3, f: 2, s: 15, days: 30
-        },
-        {
-            code: 'GEN-002', tags: ['all'], title: 'Acil çıkış ve tahliye yolu engeli',
-            hazard: 'Acil çıkış kapısı veya tahliye yolu üzerinde geçişi engelleyen malzeme/ekipman bulunduğu tespit edildi.',
-            action: 'Acil çıkış ve tahliye güzergahı derhal boşaltılacak; kapıların açılabilirliği kontrol edilecek ve düzenli kontrol sorumlusu atanacak.',
-            o: 6, f: 6, s: 15, days: 7
-        },
-        {
-            code: 'GEN-003', tags: ['all'], title: 'Yangın ekipmanı periyodik kontrol eksikliği',
-            hazard: 'Yangın söndürme cihazı, yangın dolabı veya algılama ekipmanlarında periyodik kontrol/etiket eksikliği tespit edildi.',
-            action: 'Yangın ekipmanlarının periyodik kontrolleri yetkili firma tarafından yapılacak; kontrol etiketleri güncellenecek ve erişim alanları açık tutulacak.',
-            o: 3, f: 2, s: 15, days: 30
-        },
-        {
-            code: 'GEN-004', tags: ['all'], title: 'KKD kullanımı eksikliği',
-            hazard: 'Çalışanın işin gerektirdiği kişisel koruyucu donanımı kullanmadığı veya uygun olmayan KKD kullandığı gözlendi.',
-            action: 'Uygun KKD temin edilecek, çalışanlara kullanım eğitimi verilecek ve saha sorumlusu tarafından düzenli kullanım kontrolü yapılacak.',
-            o: 6, f: 6, s: 7, days: 30
-        },
-        {
-            code: 'CON-001', tags: ['construction', 'çok tehlikeli'], title: 'Yüksekte çalışma kenar koruma eksikliği',
-            hazard: 'Yüksekte çalışma alanında korkuluk, ara korkuluk, topuk levhası veya düşmeye karşı koruma önlemlerinde eksiklik tespit edildi.',
-            action: 'Çalışma alanında toplu koruma önlemleri tamamlanmadan çalışma başlatılmayacak; uygun iskele/kenar koruma kurulacak ve düşüş durdurucu sistemler kontrol edilecek.',
-            o: 6, f: 6, s: 40, days: 7
-        },
-        {
-            code: 'CON-002', tags: ['construction', 'çok tehlikeli'], title: 'İskele kontrol ve etiket eksikliği',
-            hazard: 'İskelede uygunluk etiketi, periyodik kontrol kaydı veya güvenli kullanım koşullarında eksiklik tespit edildi.',
-            action: 'İskele yetkin kişi tarafından kontrol edilecek; uygunsuzluklar giderilene kadar kullanım durdurulacak ve kontrol etiketi güncellenecek.',
-            o: 3, f: 6, s: 40, days: 7
-        },
-        {
-            code: 'MAN-001', tags: ['manufacturing', 'tehlikeli', 'çok tehlikeli'], title: 'Makine koruyucu eksikliği',
-            hazard: 'Makine üzerinde hareketli parçalara temas riskini önleyen koruyucu veya acil durdurma sistemi eksik/uygunsuz tespit edildi.',
-            action: 'Makine koruyucuları tamamlanacak, acil durdurma butonları test edilecek; uygunsuzluk giderilene kadar makine kontrollü şekilde devre dışı bırakılacak.',
-            o: 6, f: 6, s: 15, days: 7
-        },
-        {
-            code: 'MAN-002', tags: ['manufacturing', 'tehlikeli'], title: 'Kimyasal etiket ve SDS eksikliği',
-            hazard: 'Kimyasal madde ambalajında etiketleme, uygun depolama veya Güvenlik Bilgi Formu erişimi eksikliği tespit edildi.',
-            action: 'Kimyasallar uygun etiketlenecek, uyumlu depolama yapılacak, SDS formları erişilebilir hale getirilecek ve çalışanlara bilgilendirme yapılacak.',
-            o: 3, f: 2, s: 15, days: 30
-        },
-        {
-            code: 'LOG-001', tags: ['logistics', 'transport', 'tehlikeli'], title: 'Forklift-yaya yolu ayrımı eksikliği',
-            hazard: 'Forklift/araç trafiği ile yaya yollarının yeterince ayrılmadığı veya işaretlenmediği tespit edildi.',
-            action: 'Yaya yolları çizgi/bariyer ile ayrılacak, uyarı levhaları yerleştirilecek, forklift hız ve geçiş kuralları tekrar duyurulacak.',
-            o: 6, f: 6, s: 15, days: 30
-        },
-        {
-            code: 'OFF-001', tags: ['office', 'az tehlikeli'], title: 'Ergonomi ve kablo dağınıklığı',
-            hazard: 'Ofis alanında kablo dağınıklığı, takılma riski veya ergonomik uygunsuzluk tespit edildi.',
-            action: 'Kablolar kablo kanalıyla düzenlenecek, geçiş yolları temizlenecek ve çalışma istasyonları ergonomi açısından gözden geçirilecek.',
-            o: 3, f: 2, s: 3, days: 90
-        }
+        { code: 'GEN-001', category: 'general', tags: ['all'], title: 'Elektrik panosunda uygunsuzluk', hazard: 'Elektrik panosu kapağı, uyarı etiketi, kaçak akım rölesi veya pano içi düzeninde uygunsuzluk tespit edildi.', action: 'Elektrik panosu yetkili elektrik personeli tarafından kontrol edilecek; eksik uyarı levhaları tamamlanacak, kaçak akım rölesi ve pano içi düzen mevzuata uygun hale getirilecek.', o: 3, f: 2, s: 15, days: 30 },
+        { code: 'GEN-002', category: 'general', tags: ['all'], title: 'Acil çıkış ve tahliye yolu engeli', hazard: 'Acil çıkış kapısı veya tahliye yolu üzerinde geçişi engelleyen malzeme/ekipman bulunduğu tespit edildi.', action: 'Acil çıkış ve tahliye güzergahı derhal boşaltılacak; kapıların açılabilirliği kontrol edilecek ve düzenli kontrol sorumlusu atanacak.', o: 6, f: 6, s: 15, days: 7 },
+        { code: 'GEN-003', category: 'fire', tags: ['all', 'fire'], title: 'Yangın ekipmanı periyodik kontrol eksikliği', hazard: 'Yangın söndürme cihazı, yangın dolabı veya algılama ekipmanlarında periyodik kontrol/etiket eksikliği tespit edildi.', action: 'Yangın ekipmanlarının periyodik kontrolleri yetkili firma tarafından yapılacak; kontrol etiketleri güncellenecek ve erişim alanları açık tutulacak.', o: 3, f: 2, s: 15, days: 30 },
+        { code: 'GEN-004', category: 'general', tags: ['all'], title: 'KKD kullanımı eksikliği', hazard: 'Çalışanın işin gerektirdiği kişisel koruyucu donanımı kullanmadığı veya uygun olmayan KKD kullandığı gözlendi.', action: 'Uygun KKD temin edilecek, çalışanlara kullanım eğitimi verilecek ve saha sorumlusu tarafından düzenli kullanım kontrolü yapılacak.', o: 6, f: 6, s: 7, days: 30 },
+        { code: 'GEN-005', category: 'general', tags: ['all'], title: 'Kaygan zemin / takılma riski', hazard: 'Çalışma veya geçiş alanında kaygan zemin, dağınık malzeme, seviye farkı veya takılma riski tespit edildi.', action: 'Geçiş alanı temizlenecek, kaymaz zemin uygulaması yapılacak, seviye farkları işaretlenecek ve düzenli saha kontrolü planlanacak.', o: 3, f: 6, s: 7, days: 30 },
+        { code: 'GEN-006', category: 'fire', tags: ['all', 'fire'], title: 'Acil durum yönlendirme levhası eksikliği', hazard: 'Acil çıkış, toplanma alanı veya yangın ekipmanı yönlendirme levhalarında eksiklik/uygunsuzluk tespit edildi.', action: 'Eksik yönlendirme levhaları tamamlanacak, görünürlük kontrol edilecek ve acil durum krokileri güncellenecek.', o: 3, f: 2, s: 15, days: 30 },
+        { code: 'GEN-007', category: 'general', tags: ['all'], title: 'İlk yardım dolabı içerik eksikliği', hazard: 'İlk yardım dolabında eksik, tarihi geçmiş veya uygunsuz malzeme bulunduğu tespit edildi.', action: 'İlk yardım dolabı içeriği güncellenecek, sorumlu kişi atanacak ve periyodik kontrol listesi oluşturulacak.', o: 3, f: 2, s: 7, days: 30 },
+
+        { code: 'CON-001', category: 'height', tags: ['construction', 'height', 'çok tehlikeli'], title: 'Yüksekte çalışma kenar koruma eksikliği', hazard: 'Yüksekte çalışma alanında korkuluk, ara korkuluk, topuk levhası veya düşmeye karşı koruma önlemlerinde eksiklik tespit edildi.', action: 'Çalışma alanında toplu koruma önlemleri tamamlanmadan çalışma başlatılmayacak; uygun iskele/kenar koruma kurulacak ve düşüş durdurucu sistemler kontrol edilecek.', o: 6, f: 6, s: 40, days: 7 },
+        { code: 'CON-002', category: 'construction', tags: ['construction', 'height', 'çok tehlikeli'], title: 'İskele kontrol ve etiket eksikliği', hazard: 'İskelede uygunluk etiketi, periyodik kontrol kaydı veya güvenli kullanım koşullarında eksiklik tespit edildi.', action: 'İskele yetkin kişi tarafından kontrol edilecek; uygunsuzluklar giderilene kadar kullanım durdurulacak ve kontrol etiketi güncellenecek.', o: 3, f: 6, s: 40, days: 7 },
+        { code: 'CON-003', category: 'construction', tags: ['construction', 'çok tehlikeli'], title: 'Kazı alanı çevre emniyeti eksikliği', hazard: 'Kazı alanı çevresinde bariyer, uyarı levhası veya düşmeye karşı çevre güvenliği önlemlerinde eksiklik tespit edildi.', action: 'Kazı alanı bariyerlerle çevrilecek, uyarı levhaları yerleştirilecek ve yetkisiz giriş engellenecek.', o: 6, f: 3, s: 40, days: 7 },
+        { code: 'CON-004', category: 'height', tags: ['construction', 'height', 'çok tehlikeli'], title: 'Merdiven güvenliği uygunsuzluğu', hazard: 'Portatif merdivenin sabitlenmediği, uygun açıyla kullanılmadığı veya hasarlı olduğu tespit edildi.', action: 'Hasarlı merdivenler kullanımdan kaldırılacak, merdivenler uygun açıyla/sabitleme ile kullanılacak ve çalışanlara bilgilendirme yapılacak.', o: 3, f: 3, s: 15, days: 7 },
+        { code: 'CON-005', category: 'construction', tags: ['construction', 'çok tehlikeli'], title: 'Şantiye içi düzensiz malzeme istifi', hazard: 'Şantiye alanında malzemelerin devrilme, düşme veya geçişi engelleme riski oluşturacak şekilde istiflendiği tespit edildi.', action: 'Malzeme istif alanları düzenlenecek, devrilmeye karşı sabitleme yapılacak ve geçiş yolları açık tutulacak.', o: 3, f: 6, s: 15, days: 30 },
+
+        { code: 'DEP-001', category: 'warehouse', tags: ['logistics', 'warehouse', 'transport', 'tehlikeli'], title: 'Forklift-yaya yolu ayrımı eksikliği', hazard: 'Forklift/araç trafiği ile yaya yollarının yeterince ayrılmadığı veya işaretlenmediği tespit edildi.', action: 'Yaya yolları çizgi/bariyer ile ayrılacak, uyarı levhaları yerleştirilecek, forklift hız ve geçiş kuralları tekrar duyurulacak.', o: 6, f: 6, s: 15, days: 30 },
+        { code: 'DEP-002', category: 'warehouse', tags: ['logistics', 'warehouse'], title: 'Raf sisteminde devrilme/sabitleme riski', hazard: 'Depo raf sistemlerinde sabitleme, yük etiketi veya hasarlı raf elemanı uygunsuzluğu tespit edildi.', action: 'Raf sistemleri teknik kontrolden geçirilecek, hasarlı parçalar değiştirilecek, yük limitleri görünür şekilde işaretlenecek.', o: 3, f: 3, s: 15, days: 30 },
+        { code: 'DEP-003', category: 'warehouse', tags: ['logistics', 'warehouse'], title: 'Yükleme boşaltma alanında kontrolsüz trafik', hazard: 'Yükleme/boşaltma alanında araç manevrası, kör nokta veya geri hareket sırasında yaya güvenliği riski tespit edildi.', action: 'Yükleme alanı trafik planı oluşturulacak, manevra alanları işaretlenecek ve gerektiğinde refakatçi/spotter görevlendirilecek.', o: 6, f: 3, s: 15, days: 30 },
+        { code: 'DEP-004', category: 'warehouse', tags: ['logistics', 'warehouse'], title: 'Palet istif yüksekliği uygunsuzluğu', hazard: 'Paletli yüklerin devrilme riski oluşturacak yükseklikte veya dengesiz şekilde istiflendiği tespit edildi.', action: 'Palet istif kuralları belirlenecek, maksimum istif yüksekliği işaretlenecek ve dengesiz yükler yeniden düzenlenecek.', o: 3, f: 6, s: 7, days: 30 },
+
+        { code: 'OFF-001', category: 'office', tags: ['office', 'az tehlikeli'], title: 'Ergonomi ve kablo dağınıklığı', hazard: 'Ofis alanında kablo dağınıklığı, takılma riski veya ergonomik uygunsuzluk tespit edildi.', action: 'Kablolar kablo kanalıyla düzenlenecek, geçiş yolları temizlenecek ve çalışma istasyonları ergonomi açısından gözden geçirilecek.', o: 3, f: 2, s: 3, days: 90 },
+        { code: 'OFF-002', category: 'ergonomics', tags: ['office', 'ergonomics', 'az tehlikeli'], title: 'Uygun olmayan ekran/masa düzeni', hazard: 'Çalışma istasyonunda ekran yüksekliği, sandalye ayarı veya masa düzeni ergonomik açıdan uygunsuz tespit edildi.', action: 'Çalışma istasyonu ergonomik olarak düzenlenecek, çalışan bilgilendirilecek ve ekran/sandalye ayarları kontrol edilecek.', o: 3, f: 6, s: 3, days: 90 },
+        { code: 'OFF-003', category: 'office', tags: ['office', 'az tehlikeli'], title: 'Aşırı priz/uzatma kablosu kullanımı', hazard: 'Ofis alanında çoklu priz veya uzatma kablolarının aşırı yüklendiği/uygunsuz kullanıldığı tespit edildi.', action: 'Elektrik yükü kontrol edilecek, kalıcı priz ihtiyacı değerlendirilecek ve uygunsuz çoklu priz kullanımı kaldırılacak.', o: 3, f: 3, s: 7, days: 30 },
+
+        { code: 'SCH-001', category: 'school', tags: ['school', 'education', 'az tehlikeli'], title: 'Merdiven ve koridorlarda düşme riski', hazard: 'Okul koridoru veya merdivenlerinde kayma/takılma riski, yetersiz uyarı veya uygunsuz zemin tespit edildi.', action: 'Kaymaz bant/uyarı uygulamaları yapılacak, koridorlar açık tutulacak ve nöbet/saha kontrol listesine eklenecek.', o: 3, f: 6, s: 7, days: 30 },
+        { code: 'SCH-002', category: 'school', tags: ['school', 'education'], title: 'Laboratuvar kimyasal dolabı uygunsuzluğu', hazard: 'Okul laboratuvarında kimyasalların etiket, SDS veya uyumlu depolama açısından uygunsuz olduğu tespit edildi.', action: 'Kimyasallar etiketlenecek, SDS dosyaları erişilebilir yapılacak, uyumsuz kimyasallar ayrıştırılacak ve laboratuvar sorumlusu kontrol planı oluşturacak.', o: 3, f: 2, s: 15, days: 30 },
+        { code: 'SCH-003', category: 'school', tags: ['school', 'education'], title: 'Atölye/derslik ekipman güvenliği eksikliği', hazard: 'Atölye veya derslikte kullanılan ekipmanda koruyucu, talimat veya gözetim eksikliği tespit edildi.', action: 'Ekipman kullanım talimatları görünür hale getirilecek, koruyucular kontrol edilecek ve öğretmen/gözetmen bilgilendirmesi yapılacak.', o: 3, f: 3, s: 7, days: 30 },
+
+        { code: 'HLT-001', category: 'healthcare', tags: ['healthcare', 'tehlikeli'], title: 'Tıbbi atık ayrıştırma uygunsuzluğu', hazard: 'Tıbbi atıkların uygun renk/kategori ayrımına göre toplanmadığı veya geçici depolama koşullarında uygunsuzluk olduğu tespit edildi.', action: 'Tıbbi atık ayrıştırma kuralları uygulanacak, atık kutuları etiketlenecek ve çalışanlara tekrar bilgilendirme yapılacak.', o: 3, f: 6, s: 15, days: 30 },
+        { code: 'HLT-002', category: 'healthcare', tags: ['healthcare', 'hygiene'], title: 'Kesici-delici alet kutusu uygunsuzluğu', hazard: 'Kesici-delici atık kutusunun uygun yerde bulunmadığı, doluluk oranının aşıldığı veya uygunsuz kullanıldığı tespit edildi.', action: 'Kesici-delici atık kutuları uygun noktalara yerleştirilecek, doluluk sınırı takip edilecek ve kullanım kuralları hatırlatılacak.', o: 3, f: 6, s: 15, days: 7 },
+        { code: 'HLT-003', category: 'hygiene', tags: ['healthcare', 'hygiene'], title: 'El hijyeni istasyonu eksikliği', hazard: 'El hijyeni noktalarında dezenfektan, lavabo erişimi veya bilgilendirme levhası eksikliği tespit edildi.', action: 'El hijyeni istasyonları tamamlanacak, sarf malzeme takibi yapılacak ve ilgili alanlara bilgilendirme levhaları asılacak.', o: 3, f: 6, s: 7, days: 30 },
+
+        { code: 'KIT-001', category: 'kitchen', tags: ['kitchen', 'food', 'tehlikeli'], title: 'Mutfakta sıcak yüzey/yanık riski', hazard: 'Mutfak alanında sıcak yüzey, buhar veya kızgın yağ kaynaklı yanık riskine karşı uyarı/koruma eksikliği tespit edildi.', action: 'Sıcak yüzeyler işaretlenecek, uygun eldiven/önlük kullanımı sağlanacak ve çalışma talimatı görünür hale getirilecek.', o: 3, f: 6, s: 7, days: 30 },
+        { code: 'KIT-002', category: 'kitchen', tags: ['kitchen', 'food'], title: 'Kesici ekipman kullanım riski', hazard: 'Bıçak, dilimleyici veya kesici ekipman kullanımında koruyucu, talimat veya saklama düzeni eksikliği tespit edildi.', action: 'Kesici ekipmanlar için güvenli kullanım talimatı hazırlanacak, koruyucular kontrol edilecek ve güvenli saklama alanı düzenlenecek.', o: 3, f: 6, s: 7, days: 30 },
+        { code: 'KIT-003', category: 'hygiene', tags: ['kitchen', 'food', 'hygiene'], title: 'Gıda hijyeni / çapraz bulaşma riski', hazard: 'Gıda hazırlık alanında çiğ-pişmiş ürün ayrımı, yüzey temizliği veya hijyen prosedürlerinde uygunsuzluk tespit edildi.', action: 'Hazırlık alanları ayrıştırılacak, temizlik-dezenfeksiyon planı uygulanacak ve çalışanlara hijyen kuralları hatırlatılacak.', o: 3, f: 6, s: 7, days: 30 },
+
+        { code: 'MAN-001', category: 'manufacturing', tags: ['manufacturing', 'tehlikeli', 'çok tehlikeli'], title: 'Makine koruyucu eksikliği', hazard: 'Makine üzerinde hareketli parçalara temas riskini önleyen koruyucu veya acil durdurma sistemi eksik/uygunsuz tespit edildi.', action: 'Makine koruyucuları tamamlanacak, acil durdurma butonları test edilecek; uygunsuzluk giderilene kadar makine kontrollü şekilde devre dışı bırakılacak.', o: 6, f: 6, s: 15, days: 7 },
+        { code: 'MAN-002', category: 'manufacturing', tags: ['manufacturing', 'tehlikeli'], title: 'LOTO / enerji izolasyonu eksikliği', hazard: 'Bakım/onarım sırasında enerji izolasyonu ve kilitleme-etiketleme uygulamasında eksiklik tespit edildi.', action: 'LOTO prosedürü uygulanacak, kilitleme ekipmanları temin edilecek ve bakım personeline tekrar eğitim verilecek.', o: 3, f: 3, s: 40, days: 7 },
+        { code: 'MAN-003', category: 'manufacturing', tags: ['manufacturing'], title: 'Basınçlı kap / kompresör kontrol eksikliği', hazard: 'Basınçlı ekipmanın periyodik kontrol, emniyet valfi veya kullanım alanı güvenliği açısından uygunsuz olduğu tespit edildi.', action: 'Basınçlı ekipman periyodik kontrole alınacak, emniyet donanımları kontrol edilecek ve uygunsuzluk giderilene kadar kullanım kısıtlanacak.', o: 3, f: 2, s: 15, days: 30 },
+        { code: 'MAN-004', category: 'physical', tags: ['manufacturing', 'physical'], title: 'Gürültü maruziyeti kontrol eksikliği', hazard: 'Gürültülü alanda kulak koruyucu kullanımı, uyarı levhası veya maruziyet kontrolünde eksiklik tespit edildi.', action: 'Gürültü ölçümü/alan işaretlemesi yapılacak, uygun kulak koruyucular temin edilecek ve kullanım denetimi yapılacak.', o: 3, f: 6, s: 7, days: 30 },
+        { code: 'MAN-005', category: 'physical', tags: ['manufacturing', 'physical'], title: 'Toz veya duman maruziyeti', hazard: 'Üretim alanında toz/duman oluşumu için lokal emiş, havalandırma veya uygun solunum koruyucu eksikliği tespit edildi.', action: 'Lokal havalandırma/filtrasyon kontrol edilecek, maruziyet ölçümü planlanacak ve uygun solunum koruyucu kullanımı sağlanacak.', o: 3, f: 6, s: 15, days: 30 },
+
+        { code: 'CHM-001', category: 'chemical', tags: ['chemical', 'manufacturing', 'tehlikeli'], title: 'Kimyasal etiket ve SDS eksikliği', hazard: 'Kimyasal madde ambalajında etiketleme, uygun depolama veya Güvenlik Bilgi Formu erişimi eksikliği tespit edildi.', action: 'Kimyasallar uygun etiketlenecek, uyumlu depolama yapılacak, SDS formları erişilebilir hale getirilecek ve çalışanlara bilgilendirme yapılacak.', o: 3, f: 2, s: 15, days: 30 },
+        { code: 'CHM-002', category: 'chemical', tags: ['chemical'], title: 'Uyumsuz kimyasalların birlikte depolanması', hazard: 'Birbiriyle reaksiyona girebilecek kimyasalların aynı alanda/uygunsuz şekilde depolandığı tespit edildi.', action: 'Kimyasallar uyumluluk tablosuna göre ayrıştırılacak, ikincil kaplama/sızdırmazlık sağlanacak ve depo sorumlusu kontrol listesi oluşturacak.', o: 3, f: 2, s: 40, days: 7 },
+        { code: 'CHM-003', category: 'chemical', tags: ['chemical'], title: 'Dökülme kiti eksikliği', hazard: 'Kimyasal kullanım/depolama alanında dökülme müdahale kiti veya acil müdahale talimatı bulunmadığı tespit edildi.', action: 'Dökülme kiti temin edilecek, acil müdahale talimatı asılacak ve ilgili çalışanlar bilgilendirilecek.', o: 3, f: 2, s: 15, days: 30 },
+
+        { code: 'ELC-001', category: 'electrical', tags: ['electrical', 'tehlikeli'], title: 'Açıkta kablo / geçici elektrik hattı', hazard: 'Çalışma alanında açıkta kablo, ezilme riski bulunan geçici elektrik hattı veya uygunsuz bağlantı tespit edildi.', action: 'Geçici hatlar uygun kablo kanalı/askı sistemiyle korunacak, yetkisiz bağlantılar kaldırılacak ve elektrik sorumlusu kontrol edecek.', o: 3, f: 6, s: 15, days: 7 },
+        { code: 'ELC-002', category: 'electrical', tags: ['electrical'], title: 'Topraklama/kaçak akım kontrol eksikliği', hazard: 'Elektrikli ekipman veya pano için topraklama/kaçak akım koruma kontrol kayıtlarında eksiklik tespit edildi.', action: 'Topraklama ve kaçak akım kontrolleri yetkili kişilerce yapılacak, kayıtlar arşivlenecek ve eksikler giderilecek.', o: 3, f: 2, s: 15, days: 30 },
+
+        { code: 'CFS-001', category: 'confined', tags: ['confined', 'çok tehlikeli'], title: 'Kapalı alan giriş prosedürü eksikliği', hazard: 'Kapalı alan çalışmasında gaz ölçümü, izin formu, gözcü veya kurtarma planı eksikliği tespit edildi.', action: 'Kapalı alan giriş izin prosedürü uygulanacak, gaz ölçümü yapılacak, gözcü görevlendirilecek ve kurtarma planı hazır olmadan giriş yapılmayacak.', o: 3, f: 2, s: 40, days: 7 },
+        { code: 'CFS-002', category: 'confined', tags: ['confined'], title: 'Kapalı alan havalandırma eksikliği', hazard: 'Kapalı alanda yeterli havalandırma veya atmosfer izleme önlemi bulunmadığı tespit edildi.', action: 'Mekanik havalandırma sağlanacak, atmosfer düzenli izlenecek ve izinli çalışma sistemi uygulanacak.', o: 3, f: 2, s: 40, days: 7 },
+
+        { code: 'ERG-001', category: 'ergonomics', tags: ['ergonomics', 'all'], title: 'Elle taşıma ergonomi riski', hazard: 'Çalışanların ağır yükleri uygunsuz duruşla kaldırdığı/taşıdığı veya yardımcı ekipman kullanılmadığı tespit edildi.', action: 'Yük ağırlıkları sınırlandırılacak, taşıma arabası/yardımcı ekipman kullanılacak ve çalışanlara doğru kaldırma-taşıma eğitimi verilecek.', o: 3, f: 6, s: 7, days: 30 },
+        { code: 'ERG-002', category: 'ergonomics', tags: ['ergonomics'], title: 'Tekrarlayan hareket / uygunsuz çalışma yüksekliği', hazard: 'Tekrarlayan hareket veya uygunsuz tezgah yüksekliği nedeniyle kas-iskelet sistemi riski tespit edildi.', action: 'İş istasyonu yüksekliği ayarlanacak, rotasyon/molalar planlanacak ve ergonomik yardımcı ekipman değerlendirilecek.', o: 3, f: 6, s: 7, days: 60 },
+
+        { code: 'HYG-001', category: 'hygiene', tags: ['hygiene', 'all'], title: 'Temizlik planı ve kayıt eksikliği', hazard: 'Ortak kullanım alanlarında temizlik planı, kontrol kaydı veya sorumlu kişi atamasında eksiklik tespit edildi.', action: 'Temizlik planı hazırlanacak, kontrol kayıt formu oluşturulacak ve sorumlular belirlenecek.', o: 3, f: 6, s: 3, days: 30 },
+        { code: 'HYG-002', category: 'hygiene', tags: ['hygiene'], title: 'Sanitasyon / lavabo sarf malzeme eksikliği', hazard: 'Lavabo veya hijyen noktalarında sabun, kağıt havlu, dezenfektan veya atık kutusu eksikliği tespit edildi.', action: 'Sarf malzemeler tamamlanacak, periyodik kontrol sorumlusu atanacak ve hijyen noktaları görünür şekilde düzenlenecek.', o: 3, f: 6, s: 3, days: 30 },
+
+        { code: 'PHY-001', category: 'physical', tags: ['physical'], title: 'Titreşimli ekipman kullanım riski', hazard: 'Titreşimli el aletleri kullanımında maruziyet süresi, bakım durumu veya uygun eldiven kullanımı açısından eksiklik tespit edildi.', action: 'Titreşimli ekipman bakım planına alınacak, kullanım süreleri sınırlandırılacak ve uygun KKD/rotasyon uygulanacak.', o: 3, f: 3, s: 7, days: 30 },
+        { code: 'PHY-002', category: 'physical', tags: ['physical'], title: 'Yetersiz aydınlatma', hazard: 'Çalışma veya geçiş alanında yetersiz aydınlatma nedeniyle hata, çarpma veya düşme riski tespit edildi.', action: 'Aydınlatma seviyesi ölçülecek/gözden geçirilecek, arızalı armatürler değiştirilecek ve kritik alanlar güçlendirilecek.', o: 3, f: 6, s: 7, days: 30 }
     ];
 
     let lastLoadedCompanies = [];
@@ -318,7 +359,12 @@
         if (haystack.includes('az tehlikeli')) tags.push('az tehlikeli');
         if (haystack.includes('inşaat') || haystack.includes('insaat') || haystack.includes('şantiye') || haystack.includes('santiye') || haystack.includes('41') || haystack.includes('42') || haystack.includes('43')) tags.push('construction');
         if (haystack.includes('imalat') || haystack.includes('üretim') || haystack.includes('uretim') || haystack.includes('fabrika') || haystack.includes('makine') || haystack.includes('metal')) tags.push('manufacturing');
-        if (haystack.includes('lojistik') || haystack.includes('depo') || haystack.includes('taşıma') || haystack.includes('tasima') || haystack.includes('nakliye')) tags.push('logistics', 'transport');
+        if (haystack.includes('lojistik') || haystack.includes('depo') || haystack.includes('taşıma') || haystack.includes('tasima') || haystack.includes('nakliye')) tags.push('logistics', 'warehouse', 'transport');
+        if (haystack.includes('okul') || haystack.includes('eğitim') || haystack.includes('egitim') || haystack.includes('kolej') || haystack.includes('üniversite') || haystack.includes('universite')) tags.push('school', 'education');
+        if (haystack.includes('hastane') || haystack.includes('sağlık') || haystack.includes('saglik') || haystack.includes('klinik') || haystack.includes('poliklinik')) tags.push('healthcare');
+        if (haystack.includes('restoran') || haystack.includes('mutfak') || haystack.includes('gıda') || haystack.includes('gida') || haystack.includes('yemek')) tags.push('kitchen', 'food');
+        if (haystack.includes('kimya') || haystack.includes('kimyasal') || haystack.includes('laboratuvar')) tags.push('chemical');
+        if (haystack.includes('elektrik') || haystack.includes('enerji')) tags.push('electrical');
         if (haystack.includes('ofis') || haystack.includes('büro') || haystack.includes('buro')) tags.push('office');
         return Array.from(new Set(tags));
     }
@@ -328,27 +374,49 @@
         return (lastLoadedCompanies || []).find((c) => String(c.id) === String(selectedId)) || null;
     }
 
-    function updateRiskTemplateOptions() {
+    function updateRiskTemplateOptions(categoryChanged = false) {
+        const categorySelect = document.getElementById('risk_template_category');
         const templateSelect = document.getElementById('risk_template_select');
         const statusEl = document.getElementById('template_status');
         if (!templateSelect) return;
 
+        const selectedCategory = categorySelect ? categorySelect.value : 'auto';
         const company = getSelectedCompanyFromCache();
+        let matching = [];
+
+        if (selectedCategory && selectedCategory !== 'auto') {
+            matching = RISK_TEMPLATE_LIBRARY.filter((tpl) => tpl.category === selectedCategory);
+            templateSelect.innerHTML = '<option value="">-- Hazır şablon seçin --</option>';
+            matching.forEach((tpl) => {
+                templateSelect.innerHTML += `<option value="${tpl.code}">[${tpl.code}] ${tpl.title}</option>`;
+            });
+            if (statusEl) {
+                statusEl.style.color = 'var(--text-muted)';
+                statusEl.innerText = `${TEMPLATE_CATEGORY_LABELS[selectedCategory] || 'Kategori'} kategorisinde ${matching.length} şablon listelendi.`;
+            }
+            return;
+        }
+
         if (!company) {
-            templateSelect.innerHTML = '<option value="">Önce firma seçin...</option>';
-            if (statusEl) statusEl.innerText = 'Seçilen firmanın NACE kodu ve tehlike sınıfına göre öneriler listelenir. Offline modda da çalışır.';
+            templateSelect.innerHTML = '<option value="">Önce firma seçin veya kategori seçin...</option>';
+            if (statusEl) {
+                statusEl.style.color = 'var(--text-muted)';
+                statusEl.innerText = 'Firma/NACE önerileri için firma seçin. İsterseniz kategori seçerek tüm yerel şablonları da görüntüleyebilirsiniz.';
+            }
             return;
         }
 
         const tags = inferCompanyTemplateTags(company);
-        const matching = RISK_TEMPLATE_LIBRARY.filter((tpl) => tpl.tags.some((tag) => tags.includes(tag)));
+        matching = RISK_TEMPLATE_LIBRARY.filter((tpl) => tpl.tags.some((tag) => tags.includes(tag)));
         templateSelect.innerHTML = '<option value="">-- Hazır şablon seçin --</option>';
         matching.forEach((tpl) => {
-            templateSelect.innerHTML += `<option value="${tpl.code}">${tpl.title}</option>`;
+            const categoryLabel = TEMPLATE_CATEGORY_LABELS[tpl.category] || tpl.category;
+            templateSelect.innerHTML += `<option value="${tpl.code}">[${categoryLabel}] ${tpl.title}</option>`;
         });
         if (statusEl) {
+            statusEl.style.color = 'var(--text-muted)';
             const info = [company.nace_code, company.danger_class].filter(Boolean).join(' / ') || company.company_name;
-            statusEl.innerText = `${info} için ${matching.length} hazır öneri listelendi.`;
+            statusEl.innerText = `${info} için ${matching.length} hazır öneri listelendi. Daha fazla seçenek için kategori seçebilirsiniz.`;
         }
     }
 
