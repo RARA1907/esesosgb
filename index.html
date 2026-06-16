@@ -7,12 +7,22 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f9; padding: 30px; display: none; }
-        .card { background: white; padding: 25px; border-radius: 12px; max-width: 800px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .card { background: white; padding: 25px; border-radius: 12px; max-width: 850px; margin: 0 auto; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
         .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 15px; }
         h2 { color: #1e293b; margin: 0; }
         .user-info { font-size: 14px; color: #475569; font-weight: 600; display: flex; align-items: center; gap: 10px; }
         .logout-btn { background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; }
         .logout-btn:hover { background: #dc2626; }
+        
+        /* DASHBOARD METRİK KARTLARI TASARIMI */
+        .dashboard-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px; }
+        .metric-box { padding: 20px; border-radius: 10px; color: white; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .metric-blue { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+        .metric-red { background: linear-gradient(135deg, #ef4444, #b91c1c); }
+        .metric-orange { background: linear-gradient(135deg, #f97316, #c2410c); }
+        .metric-title { font-size: 13px; font-weight: 600; text-transform: uppercase; opacity: 0.9; }
+        .metric-value { font-size: 28px; font-weight: bold; margin-top: 5px; }
+
         .form-group { margin-bottom: 15px; position: relative; }
         label { display: block; margin-bottom: 5px; color: #64748b; font-weight: 600; }
         input, select { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; }
@@ -47,14 +57,29 @@
         <button class="logout-btn" onclick="handleLogout()">Güvenli Çıkış</button>
     </div>
 
-    <div style="display: flex; gap: 10px; margin-bottom: 20px; justify-content: center;">
+    <div style="display: flex; gap: 10px; margin-bottom: 25px; justify-content: center;">
         <a href="index.html" style="background:#1e293b; color:white; padding:10px 15px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:14px;">🏢 Firma Yönetimi</a>
         <a id="menu_risk" href="risk.html" style="background:#0284c7; color:white; padding:10px 15px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:14px; display:none;">🦺 Uzman Risk Motoru</a>
         <a id="menu_medical" href="medical.html" style="background:#16a34a; color:white; padding:10px 15px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:14px; display:none;">🩺 Hekim Sağlık Kartı</a>
     </div>
 
+    <div class="dashboard-grid">
+        <div class="metric-box metric-blue">
+            <div class="metric-title">Toplam Firma</div>
+            <div class="metric-value" id="stat_total_firms">0</div>
+        </div>
+        <div class="metric-box metric-red">
+            <div class="metric-title">Çok Tehlikeli</div>
+            <div class="metric-value" id="stat_danger_firms">0</div>
+        </div>
+        <div class="metric-box metric-orange">
+            <div class="metric-title">Açık Risk Bulgusu</div>
+            <div class="metric-value" id="stat_total_risks">0</div>
+        </div>
+    </div>
+
     <h2>🏢 Akıllı Firma Yönetim Paneli</h2>
-    <p style="color: #64748b; font-size: 14px;">Sistem aktif koruma altındadır. Veriler güvenle kaydedilir.</p>
+    <p style="color: #64748b; font-size: 14px;">Müşteri firmaları ve NACE kayıtlarını buradan yönetebilirsiniz.</p>
     
     <div class="form-group">
         <label>Firma Adı</label>
@@ -111,55 +136,55 @@
 
     window.onload = async function() {
         const { data: { session } } = await dbClient.auth.getSession();
+        if (!session) { window.location.href = "login.html"; return; }
         
-        if (!session) {
-            window.location.href = "login.html";
-        } else {
-            document.body.style.display = "block";
-            const email = session.user.email;
-            document.getElementById('current_user_email').innerText = email;
-            
-            // 🛡️ ROL KONTROLÜ VE MENÜ KISITLAMA
-            if (email.includes('uzman') || email.includes('admin')) {
-                document.getElementById('menu_risk').style.display = 'block';
-            }
-            if (email.includes('hekim') || email.includes('admin')) {
-                document.getElementById('menu_medical').style.display = 'block';
-            }
-            
-            fetchCompanies();
-        }
+        document.body.style.display = "block";
+        const email = session.user.email;
+        document.getElementById('current_user_email').innerText = email;
+        
+        if (email.includes('uzman') || email.includes('admin')) document.getElementById('menu_risk').style.display = 'block';
+        if (email.includes('hekim') || email.includes('admin')) document.getElementById('menu_medical').style.display = 'block';
+        
+        fetchCompanies();
+        fetchDashboardStats(); // Canlı sayaçları çalıştırıyoruz
     };
 
-    async function handleLogout() {
-        await dbClient.auth.signOut();
-        window.location.href = "login.html";
+    // VERİTABANINDAN METRİKLERİ SAYAN FONKSİYON
+    async function fetchDashboardStats() {
+        try {
+            // 1. Toplam firma ve Çok Tehlikeli firma sayısını çekiyoruz
+            const { data: companies } = await dbClient.from('customer_companies').select('danger_class');
+            if (companies) {
+                document.getElementById('stat_total_firms').innerText = companies.length;
+                const dangerCount = companies.filter(c => c.danger_class === 'Çok Tehlikeli').length;
+                document.getElementById('stat_danger_firms').innerText = dangerCount;
+            }
+
+            // 2. risk_assessments tablosundan toplam risk sayısını çekiyoruz
+            const { data: risks } = await dbClient.from('risk_assessments').select('id');
+            if (risks) {
+                document.getElementById('stat_total_risks').innerText = risks.length;
+            }
+        } catch (err) { console.error("İstatistik hatası:", err.message); }
     }
+
+    async function handleLogout() { await dbClient.auth.signOut(); window.location.href = "login.html"; }
 
     async function searchNace() {
         const query = document.getElementById('nace_search').value;
         const list = document.getElementById('suggestions');
         if (query.length < 2) { list.style.display = 'none'; return; }
-
-        const { data } = await dbClient
-            .from('nace_codes')
-            .select('*')
-            .or(`nace_code.ilike.%${query}%,description.ilike.%${query}%`)
-            .limit(5);
-
+        const { data } = await dbClient.from('nace_codes').select('*').or(`nace_code.ilike.%${query}%,description.ilike.%${query}%`).limit(5);
         if (data && data.length > 0) {
             list.innerHTML = ''; list.style.display = 'block';
-            data.forEach(item => {
-                list.innerHTML += `<li onclick="selectNace('${item.nace_code}', '${item.danger_class}')"><strong>${item.nace_code}</strong> - ${item.description}</li>`;
-            });
+            data.forEach(item => { list.innerHTML += `<li onclick="selectNace('${item.nace_code}', '${item.danger_class}')"><strong>${item.nace_code}</strong> - ${item.description}</li>`; });
         } else { list.style.display = 'none'; }
     }
 
     function selectNace(code, dangerClass) {
         selectedNaceCode = code; selectedDangerClass = dangerClass;
         document.getElementById('nace_search').value = code;
-        const dangerInput = document.getElementById('danger_display');
-        dangerInput.value = dangerClass;
+        document.getElementById('danger_display').value = dangerClass;
         document.getElementById('suggestions').style.display = 'none';
     }
 
@@ -167,10 +192,7 @@
         const tbody = document.getElementById('company_table_body');
         try {
             const { data } = await dbClient.from('customer_companies').select('*').order('created_at', { ascending: false });
-            if (!data || data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#94a3b8;">Henüz kayıtlı firma bulunmuyor.</td></tr>`;
-                return;
-            }
+            if (!data || data.length === 0) { tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#94a3b8;">Henüz kayıtlı firma bulunmuyor.</td></tr>`; return; }
             tbody.innerHTML = '';
             data.forEach(company => {
                 let badgeClass = company.danger_class === 'Tehlikeli' ? 'badge-tehlike' : (company.danger_class === 'Çok Tehlikeli' ? 'badge-cok' : 'badge-az');
@@ -183,17 +205,17 @@
         const name = document.getElementById('comp_name').value;
         const tax = document.getElementById('tax_no').value;
         const statusDiv = document.getElementById('status');
-
         if(!name || !tax || !selectedNaceCode) { statusDiv.style.color = "red"; statusDiv.innerText = "Lütfen alanları eksiksiz doldurun!"; return; }
         statusDiv.style.color = "blue"; statusDiv.innerText = "Buluta gönderiliyor...";
-
         try {
             const { error } = await dbClient.from('customer_companies').insert([{ company_name: name, tax_number: tax, nace_code: selectedNaceCode, danger_class: selectedDangerClass }]);
             if (error) { statusDiv.style.color = "red"; statusDiv.innerText = "Hata: " + error.message; }
             else {
                 statusDiv.style.color = "green"; statusDiv.innerText = "🚀 Başarılı! Firma kaydedildi.";
                 document.getElementById('comp_name').value = ''; document.getElementById('tax_no').value = ''; document.getElementById('nace_search').value = ''; document.getElementById('danger_display').value = '';
-                selectedNaceCode = ""; selectedDangerClass = ""; fetchCompanies();
+                selectedNaceCode = ""; selectedDangerClass = ""; 
+                fetchCompanies();
+                fetchDashboardStats(); // Yeni firma eklenince sayaçları da anlık güncelle
             }
         } catch (err) { statusDiv.style.color = "red"; statusDiv.innerText = "Bağlantı Hatası: " + err.message; }
     }
