@@ -635,7 +635,40 @@
         tbody td { padding: 9px 11px !important; }
         .worker-count-link { display:inline-flex !important; align-items:center !important; justify-content:center !important; min-width:56px !important; min-height:28px !important; padding:5px 9px !important; line-height:1.1 !important; border-radius:999px !important; text-decoration:none !important; }
         .page-desc { max-width: none !important; }
+/* Kadro Yönetimi tablo filtreleme ve sıralama */
+.sortable-th {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+}
 
+.sortable-th:hover {
+    color: var(--primary);
+}
+
+.sort-indicator {
+    font-size: 10px;
+    margin-left: 4px;
+    opacity: 0.75;
+}
+
+.worker-filter-row th {
+    background: var(--bg-card) !important;
+    padding: 6px 8px !important;
+}
+
+.worker-filter-input {
+    width: 100%;
+    min-width: 80px;
+    padding: 7px 8px !important;
+    font-size: 12px !important;
+    border-radius: 8px !important;
+}
+
+.worker-filter-input::placeholder {
+    color: var(--text-muted);
+    opacity: 0.75;
+}
     </style>
 </head>
 <body>
@@ -686,13 +719,19 @@
         <h3>📋 Firmaya Kayıtlı Aktif Çalışan Listesi (Canlı)</h3>
         <table>
             <thead>
-                <tr>
-                    <th>Adı Soyadı</th>
-                    <th>Yaş</th>
-                    <th>Cinsiyet</th>
-                    <th>Görevi / Unvanı</th>
-                </tr>
-            </thead>
+    <tr>
+        <th class="sortable-th" onclick="sortWorkersBy('full_name')">Adı Soyadı <span id="sort_full_name" class="sort-indicator"></span></th>
+        <th class="sortable-th" onclick="sortWorkersBy('age')">Yaş <span id="sort_age" class="sort-indicator"></span></th>
+        <th class="sortable-th" onclick="sortWorkersBy('gender')">Cinsiyet <span id="sort_gender" class="sort-indicator"></span></th>
+        <th class="sortable-th" onclick="sortWorkersBy('job_title')">Görevi / Unvanı <span id="sort_job_title" class="sort-indicator"></span></th>
+    </tr>
+    <tr class="worker-filter-row">
+        <th><input class="worker-filter-input" data-field="full_name" oninput="applyWorkerFilters()" placeholder="Ad soyad filtrele"></th>
+        <th><input class="worker-filter-input" data-field="age" oninput="applyWorkerFilters()" placeholder="Yaş"></th>
+        <th><input class="worker-filter-input" data-field="gender" oninput="applyWorkerFilters()" placeholder="Cinsiyet"></th>
+        <th><input class="worker-filter-input" data-field="job_title" oninput="applyWorkerFilters()" placeholder="Görev / unvan"></th>
+    </tr>
+</thead>
             <tbody id="worker_table_body"><tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Lütfen yukarıdan bir firma seçin...</td></tr></tbody>
         </table>
     </div>
@@ -703,6 +742,9 @@
     const SUPABASE_KEY = "sb_publishable_LtrytF9wyS3u-KgSZk7heg_SZc7hhoY";
     const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     let CURRENT_AUTH = null;
+    let workerTableRows = [];
+let workerSortField = '';
+let workerSortDirection = 'asc';
 
     // 🔐 GERÇEK ROL / ERİŞİM YARDIMCILARI
     // Öncelik: osgb_staff.access_role + can_login + aktiflik bilgisi.
@@ -865,20 +907,168 @@
         } catch (err) { console.error(err.message); }
     }
 
-    async function fetchWorkers() {
-        const compId = document.getElementById('company_select').value;
-        const tbody = document.getElementById('worker_table_body');
-        if(!compId) { tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Lütfen yukarıdan bir firma seçin...</td></tr>`; return; }
-        try {
-            let query = dbClient.from('workers').select('*').eq('company_id', compId).order('created_at', { ascending: false });
-            if (CURRENT_AUTH && CURRENT_AUTH.tenant_id) query = query.eq('tenant_id', CURRENT_AUTH.tenant_id);
-            const { data } = await query;
-            if (!data || data.length === 0) { tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Kayıtlı personel bulunmuyor.</td></tr>`; return; }
-            tbody.innerHTML = '';
-            data.forEach(w => { tbody.innerHTML += `<tr><td><strong>${w.full_name}</strong></td><td>${w.age}</td><td>${w.gender}</td><td>${w.job_title || '-'}</td></tr>`; });
-        } catch (err) { console.error(err.message); }
+   async function fetchWorkers() {
+    const compId = document.getElementById('company_select').value;
+    const tbody = document.getElementById('worker_table_body');
+
+    if (!compId) {
+        workerTableRows = [];
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Lütfen yukarıdan bir firma seçin...</td></tr>`;
+        return;
     }
 
+    try {
+        let query = dbClient
+            .from('workers')
+            .select('*')
+            .eq('company_id', compId)
+            .order('created_at', { ascending: false });
+
+        if (CURRENT_AUTH && CURRENT_AUTH.tenant_id) {
+            query = query.eq('tenant_id', CURRENT_AUTH.tenant_id);
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            workerTableRows = [];
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Kayıtlı personel bulunmuyor.</td></tr>`;
+            return;
+        }
+
+        workerTableRows = data.map(w => ({
+            id: w.id,
+            full_name: w.full_name || '',
+            age: w.age !== null && w.age !== undefined ? Number(w.age) : '',
+            gender: w.gender || '',
+            job_title: w.job_title || ''
+        }));
+
+        renderWorkerTable();
+
+    } catch (err) {
+        console.error(err.message);
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:red;">Hata: ${err.message}</td></tr>`;
+    }
+}
+function escapeHtml(value) {
+    return (value || '').toString().replace(/[&<>'"]/g, function (char) {
+        return {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            "'": '&#39;',
+            '"': '&quot;'
+        }[char];
+    });
+}
+
+function getWorkerFilteredRows() {
+    const filters = {};
+
+    document.querySelectorAll('.worker-filter-input').forEach(input => {
+        const field = input.dataset.field;
+        const value = (input.value || '').toString().trim().toLowerCase();
+
+        if (field && value) {
+            filters[field] = value;
+        }
+    });
+
+    let rows = [...workerTableRows];
+
+    Object.keys(filters).forEach(field => {
+        const value = filters[field];
+
+        rows = rows.filter(row => {
+            const cellValue = row[field] !== undefined && row[field] !== null
+                ? row[field].toString().toLowerCase()
+                : '';
+
+            return cellValue.includes(value);
+        });
+    });
+
+    if (workerSortField) {
+        rows.sort((a, b) => {
+            const av = a[workerSortField];
+            const bv = b[workerSortField];
+
+            if (typeof av === 'number' && typeof bv === 'number') {
+                return workerSortDirection === 'asc' ? av - bv : bv - av;
+            }
+
+            return workerSortDirection === 'asc'
+                ? (av || '').toString().localeCompare((bv || '').toString(), 'tr')
+                : (bv || '').toString().localeCompare((av || '').toString(), 'tr');
+        });
+    }
+
+    return rows;
+}
+
+function renderWorkerTable() {
+    const tbody = document.getElementById('worker_table_body');
+    const rows = getWorkerFilteredRows();
+
+    updateWorkerSortIndicators();
+
+    if (!rows || rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Filtreye uygun çalışan bulunamadı.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = '';
+
+    rows.forEach(w => {
+        tbody.innerHTML += `
+            <tr>
+                <td><strong>${escapeHtml(w.full_name)}</strong></td>
+                <td>${escapeHtml(w.age)}</td>
+                <td>${escapeHtml(w.gender)}</td>
+                <td>${escapeHtml(w.job_title || '-')}</td>
+            </tr>
+        `;
+    });
+}
+
+function applyWorkerFilters() {
+    renderWorkerTable();
+}
+
+function sortWorkersBy(field) {
+    if (workerSortField === field) {
+        workerSortDirection = workerSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        workerSortField = field;
+        workerSortDirection = 'asc';
+    }
+
+    renderWorkerTable();
+}
+
+function updateWorkerSortIndicators() {
+    const fields = [
+        'full_name',
+        'age',
+        'gender',
+        'job_title'
+    ];
+
+    fields.forEach(field => {
+        const el = document.getElementById(`sort_${field}`);
+
+        if (!el) return;
+
+        if (field === workerSortField) {
+            el.innerText = workerSortDirection === 'asc' ? '▲' : '▼';
+        } else {
+            el.innerText = '';
+        }
+    });
+}
     async function saveWorker() {
         const compId = document.getElementById('company_select').value;
         const name = document.getElementById('worker_name').value;
