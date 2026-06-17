@@ -632,34 +632,31 @@
         }
 
     
-        /* v26.1 layout and typography fixes */
-        .logo-area { font-weight: 600 !important; letter-spacing: .1px !important; font-size: 17px !important; }
-        .logo-area #lbl_osgb_title { font-weight: 600 !important; }
+
+        /* v26.2 hotfix: keep v26 visual system, add branding/table/layout fixes */
+        .logo-area { font-weight: 500 !important; letter-spacing: .01em !important; font-size: 18px !important; }
+        .logo-area #lbl_osgb_title { font-weight: 500 !important; }
         .tenant-logo-img { width: 34px !important; height: 34px !important; object-fit: contain !important; border-radius: 8px !important; background: #fff !important; border: 1px solid var(--border-color) !important; padding: 3px !important; box-sizing: border-box !important; flex: 0 0 auto !important; }
-        table, thead, tbody, tr, th, td { font-family: inherit !important; }
-        table { font-size: 13px !important; }
+        table, thead, tbody, tr, th, td { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif !important; }
+        table { font-size: 13px !important; border-collapse: separate !important; border-spacing: 0 !important; }
         th, td { line-height: 1.35 !important; vertical-align: middle !important; }
         tbody td { padding: 9px 11px !important; }
+        .worker-count-link { display:inline-flex !important; align-items:center !important; justify-content:center !important; min-width:56px !important; min-height:28px !important; padding:5px 9px !important; line-height:1.1 !important; border-radius:999px !important; text-decoration:none !important; }
         .page-desc { max-width: none !important; }
+
     
-    
-        /* v26.1 SaaS Yönetimi yatay oluşturma + geniş müşteri tablosu */
+        /* v26.2 saas single column layout */
         .grid { display: block !important; margin-bottom: 24px !important; }
         .grid > div:first-child { position: static !important; display: block !important; }
         .tenant-create-panel { margin-bottom: 18px !important; }
-        .tenant-create-panel h3 { grid-column: 1 / -1; }
-        .tenant-create-panel .row { grid-template-columns: minmax(0, 1.5fr) minmax(120px, .5fr) !important; }
-        #tenants_tbody .tenant-actions { display:flex; flex-direction:column; gap:6px; align-items:stretch; min-width:120px; }
-        #tenants_tbody .tenant-actions .btn { width:100%; white-space:nowrap; justify-content:center; }
-        #tenants_tbody td { padding-top:10px !important; padding-bottom:10px !important; }
-        .super-admin-lock-note { margin-top:8px; padding:8px 10px; border-radius:10px; background:#fff7ed; color:#9a3412; border:1px solid #fed7aa; font-size:12px; }
-
-    
-        .tenant-create-grid { display:grid; grid-template-columns:1fr; gap:18px; }
-        .create-section { border:1px solid rgba(15,23,42,.08); border-radius:14px; padding:14px; background:rgba(248,250,252,.72); }
-        .create-section h4 { margin:0 0 12px; color:var(--text-main); font-size:15px; }
-        @media (min-width: 980px) { .tenant-create-grid { grid-template-columns: minmax(0,1.15fr) minmax(0,.85fr); } }
-
+        @media(min-width: 920px){
+            .tenant-create-panel { display: grid !important; grid-template-columns: minmax(0,1.1fr) minmax(0,.9fr); gap: 13px 22px; align-items: start; }
+            .tenant-create-panel > h3, .tenant-create-panel > .link-box, .tenant-create-panel > .actions, .tenant-create-panel > .status { grid-column: 1 / -1; }
+        }
+        .action-stack { display:flex; flex-direction:column; gap:6px; min-width: 118px; }
+        .action-stack .btn { width:100%; margin:0 !important; white-space:nowrap; }
+        .super-admin-lock-note { margin: 8px 0 10px; padding: 10px 12px; border-radius: 12px; background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; font-size: 13px; font-weight: 700; }
+        .hidden { display:none !important; }
     </style>
 </head>
 <body>
@@ -674,9 +671,13 @@
         </div>
         <div class="nav-container">
             <a href="dashboard.html" class="nav-btn">🏠 Ana Sayfa</a>
-            <a href="saas-admin.html" class="nav-btn active-page">🧩 SaaS Yönetimi</a>
-            <a href="index.html" class="nav-btn">Firma Yönetimi</a>
-            <a id="menu_staff" href="staff.html" class="nav-btn">🔑 Personel Yönetimi</a>
+            <a id="menu_saas" href="saas-admin.html" class="nav-btn active-page" style="display:none;">🧩 SaaS Yönetimi</a>
+            <a id="menu_staff" href="staff.html" class="nav-btn" style="display:none;">🔑 Personel Yönetimi</a>
+            <a href="schedule.html" class="nav-btn">📅 Aylık Takvim</a>
+            <a href="index.html" class="nav-btn">🏢 Firma Yönetimi</a>
+            <a href="workers.html" class="nav-btn">👥 Kadro Yönetimi</a>
+            <a id="menu_risk" href="risk.html" class="nav-btn" style="display:none;">🦺 Uzman Risk Motoru</a>
+            <a id="menu_medical" href="medical.html" class="nav-btn" style="display:none;">🩺 Hekim Sağlık Kartı</a>
         </div>
     </div>
 
@@ -687,46 +688,40 @@
         <div>
             <div class="panel tenant-create-panel">
                 <h3>➕ Yeni Müşteri OSGB ve İlk Admin Kullanıcısı</h3>
-                <div class="tenant-create-grid">
-                    <div class="create-section">
-                        <h4>Yeni Müşteri OSGB</h4>
-                        <label>OSGB / Müşteri Adı</label>
-                        <input id="tenant_name" placeholder="Örn. XYZ OSGB">
-                        <div class="row">
-                            <div>
-                                <label>Kısa Kod / Slug</label>
-                                <input id="tenant_slug" placeholder="xyz" oninput="previewLoginLink()">
-                            </div>
-                            <div>
-                                <label>Tema Rengi</label>
-                                <input id="tenant_color" type="color" value="#2563eb">
-                            </div>
-                        </div>
-                        <label>Logo Dosyası <span class="muted">(opsiyonel)</span></label>
-                        <div class="logo-upload-box">
-                            <div class="logo-upload-row">
-                                <img id="tenant_logo_preview" class="logo-preview" alt="Logo önizleme" src="">
-                                <input id="tenant_logo_file" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onchange="previewSelectedLogo('tenant_logo_file','tenant_logo_preview')">
-                            </div>
-                            <div class="help-text">PNG, JPG, WebP veya SVG seçebilirsin. Büyük görseller otomatik küçültülüp sıkıştırılır; üst menüde logo olarak gösterilir.</div>
-                        </div>
-                        <input id="tenant_logo" type="hidden">
+                <label>OSGB / Müşteri Adı</label>
+                <input id="tenant_name" placeholder="Örn. XYZ OSGB">
+                <div class="row">
+                    <div>
+                        <label>Kısa Kod / Slug</label>
+                        <input id="tenant_slug" placeholder="xyz" oninput="previewLoginLink()">
                     </div>
-                    <div class="create-section">
-                        <h4>İlk Admin Kullanıcısı</h4>
-                        <label>Admin Ad Soyad</label>
-                        <input id="admin_name" placeholder="Örn. Ayşe Yılmaz">
-                        <label>Admin E-posta</label>
-                        <input id="admin_email" type="email" placeholder="admin@firma.com">
-                        <label>Üretilecek Giriş Linki</label>
-                        <div class="link-box" id="login_link_preview">Slug girince link oluşur.</div>
-                        <div class="actions">
-                            <button class="btn btn-primary" onclick="createTenantWithAdmin()">Müşteriyi ve Admini Oluştur</button>
-                            <button class="btn btn-secondary" onclick="clearForm()">Temizle</button>
-                        </div>
-                        <div id="form_status" class="status"></div>
+                    <div>
+                        <label>Tema Rengi</label>
+                        <input id="tenant_color" type="color" value="#2563eb">
                     </div>
                 </div>
+                <label>Logo Dosyası <span class="muted">(opsiyonel)</span></label>
+                <div class="logo-upload-box">
+                    <div class="logo-upload-row">
+                        <img id="tenant_logo_preview" class="logo-preview" alt="Logo önizleme" src="">
+                        <input id="tenant_logo_file" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onchange="previewSelectedLogo('tenant_logo_file','tenant_logo_preview')">
+                    </div>
+                    <div class="help-text">PNG, JPG, WebP veya SVG seçebilirsin. Büyük görseller otomatik küçültülüp sıkıştırılır; üst menüde 32×32 logo olarak gösterilir.</div>
+                </div>
+                <input id="tenant_logo" type="hidden">
+                <label>Üretilecek Giriş Linki</label>
+                <div class="link-box" id="login_link_preview">Slug girince link oluşur.</div>
+
+                <h3 style="margin-top:22px;">👤 İlk Admin Kullanıcısı</h3>
+                <label>Admin Ad Soyad</label>
+                <input id="admin_name" placeholder="Örn. Ayşe Yılmaz">
+                <label>Admin E-posta</label>
+                <input id="admin_email" type="email" placeholder="admin@firma.com">
+                <div class="actions">
+                    <button class="btn btn-primary" onclick="createTenantWithAdmin()">Müşteriyi ve Admini Oluştur</button>
+                    <button class="btn btn-secondary" onclick="clearForm()">Temizle</button>
+                </div>
+                <div id="form_status" class="status"></div>
             </div>
 
             <div id="edit_panel" class="panel edit-panel hidden">
@@ -953,11 +948,11 @@ async function loadTenants(){
       <td><div class="link-box">${safeUrl}</div><button class="btn btn-secondary btn-small" onclick="copyText('${safeUrl}')">Kopyala</button></td>
       <td>${adminsHtml}</td>
       <td>${active?'<span class="badge badge-green">Aktif</span>':'<span class="badge badge-red">Pasif</span>'}</td>
-      <td>
-        <button class="btn btn-primary btn-small" onclick="editTenant('${t.id}')">Düzenle</button><br>
-        ${inviteButton}<br>
+      <td><div class="action-stack">
+        <button class="btn btn-primary btn-small" onclick="editTenant('${t.id}')">Düzenle</button>
+        ${inviteButton}
         <button class="btn ${active?'btn-danger':'btn-green'} btn-small" onclick="toggleTenant('${t.id}', ${active})">${active?'Pasifleştir':'Aktifleştir'}</button>
-      </td>
+      </div></td>
     </tr>`;
   }
 }
@@ -980,14 +975,8 @@ async function editTenant(id){
   document.getElementById('edit_tenant_active').value=(t.is_active!==false).toString();
   document.getElementById('edit_admin_name').value=admin ? (admin.name_surname||'') : '';
   document.getElementById('edit_admin_email').value=admin ? (admin.email||'') : '';
-  const adminRole = admin ? (normalizeAccessRole(admin.access_role)||'admin') : 'admin';
-  const isSuperAdmin = adminRole === 'super_admin';
-  document.getElementById('edit_admin_role').value=adminRole;
-  document.getElementById('edit_admin_role').dataset.originalRole = adminRole;
-  document.getElementById('edit_admin_email').dataset.originalEmail = admin ? (admin.email||'') : '';
+  document.getElementById('edit_admin_role').value=admin ? (normalizeAccessRole(admin.access_role)||'admin') : 'admin';
   document.getElementById('edit_admin_can_login').value=(!admin || admin.can_login!==false).toString();
-  ['edit_admin_name','edit_admin_email','edit_admin_role','edit_admin_can_login'].forEach(function(id){ const el=document.getElementById(id); if(el) el.disabled=isSuperAdmin; });
-  const lockNote=document.getElementById('edit_super_admin_lock_note'); if(lockNote) lockNote.classList.toggle('hidden', !isSuperAdmin);
   document.getElementById('edit_panel').classList.remove('hidden');
   previewEditLoginLink();
   window.scrollTo({top:0, behavior:'smooth'});
@@ -1004,6 +993,7 @@ async function saveEditedTenant(){
     const isActive=document.getElementById('edit_tenant_active').value==='true';
     const adminName=document.getElementById('edit_admin_name').value.trim();
     const adminEmail=document.getElementById('edit_admin_email').value.trim().toLowerCase();
+    const originalAdminRole = document.getElementById('edit_admin_role').dataset.originalRole || '';
     const adminRole=document.getElementById('edit_admin_role').value;
     const adminCanLogin=document.getElementById('edit_admin_can_login').value==='true';
     if(!tenantId || !name || !slug) throw new Error('Müşteri adı ve slug zorunlu.');
@@ -1012,10 +1002,7 @@ async function saveEditedTenant(){
     if(uploadedLogo) logo = uploadedLogo;
     const {error:tErr}=await dbClient.from('tenants').update({name, slug, logo_url:logo, primary_color:color, is_active:isActive}).eq('id', tenantId);
     if(tErr) throw tErr;
-    const originalAdminRole = document.getElementById('edit_admin_role').dataset.originalRole || '';
-    if(adminId && originalAdminRole === 'super_admin'){
-      // Super Admin yetkisi korunur; logo/tema/tenant bilgisi kaydedilir, kullanıcı rolüne dokunulmaz.
-    } else if(adminId){
+    if(adminId){
       const {error:aErr}=await dbClient.from('osgb_staff').update({name_surname:adminName, email:adminEmail, access_role:adminRole, can_login:adminCanLogin, is_active_manual:adminCanLogin?'Aktif':'Pasif'}).eq('id', adminId);
       if(aErr) throw aErr;
     } else {
@@ -1023,7 +1010,7 @@ async function saveEditedTenant(){
       if(iErr) throw iErr;
       document.getElementById('edit_admin_id').value=newAdmin.id;
     }
-    if((document.getElementById('edit_admin_role').dataset.originalRole || '') === 'super_admin') setEditStatus('Müşteri bilgileri güncellendi. Super Admin kullanıcı bilgileri korunarak değiştirilmedi.', true); else setEditStatus('Kayıt güncellendi.', true);
+    if(originalAdminRole === 'super_admin') setEditStatus('Müşteri bilgileri güncellendi. Super Admin kullanıcı bilgileri korunarak değiştirilmedi.', true); else setEditStatus('Kayıt güncellendi.', true);
     await loadTenants();
   }catch(err){ setEditStatus('Hata: '+(err.message||err), false); }
 }
