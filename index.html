@@ -852,6 +852,7 @@
         const userInfo = document.getElementById('current_user_email');
         if (userInfo) userInfo.innerText = `${auth.email} • ${roleLabel(auth.role)}`;
         setTenantBranding(auth.tenant);
+        window.CURRENT_AUTH = auth;
         applyRoleBasedNavigation(auth.role);
         if (page && !canAccessPage(auth.role, page)) {
             window.location.href = 'dashboard.html';
@@ -920,13 +921,13 @@
     async function fetchCompanies() {
         const tbody = document.getElementById('company_table_body');
         try {
-            const { data: companies } = await dbClient.from('customer_companies').select('*').order('created_at', { ascending: false });
+            const { data: companies } = await dbClient.from('customer_companies').select('*').eq('tenant_id', window.CURRENT_AUTH.tenant_id).order('created_at', { ascending: false });
             if (!companies || companies.length === 0) { tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted);">Henüz kayıtlı firma bulunmuyor.</td></tr>`; return; }
             tbody.innerHTML = '';
             
             for (const company of companies) {
                 let badgeClass = company.danger_class === 'Tehlikeli' ? 'badge-tehlike' : (company.danger_class === 'Çok Tehlikeli' ? 'badge-cok' : 'badge-az');
-                const { count } = await dbClient.from('workers').select('*', { count: 'exact', head: true }).eq('company_id', company.id);
+                const { count } = await dbClient.from('workers').select('*', { count: 'exact', head: true }).eq('tenant_id', window.CURRENT_AUTH.tenant_id).eq('company_id', company.id);
                 const workerCount = count || 0;
 
                 let uzmanKatsayi = 10; let hekimKatsayi = 5;
@@ -958,7 +959,7 @@
         if(!name || !tax || !selectedNaceCode) { statusDiv.style.color = "red"; statusDiv.innerText = "Lütfen alanları eksiksiz doldurun!"; return; }
         statusDiv.style.color = "blue"; statusDiv.innerText = "Buluta gönderiliyor...";
         try {
-            const { error } = await dbClient.from('customer_companies').insert([{ company_name: name, tax_number: tax, nace_code: selectedNaceCode, danger_class: selectedDangerClass }]);
+            const { error } = await dbClient.from('customer_companies').insert([{ tenant_id: window.CURRENT_AUTH.tenant_id, company_name: name, tax_number: tax, nace_code: selectedNaceCode, danger_class: selectedDangerClass }]);
             if (error) { statusDiv.style.color = "red"; statusDiv.innerText = "Hata: " + error.message; }
             else {
                 statusDiv.style.color = "green"; statusDiv.innerText = "🚀 Başarılı! Firma kaydedildi.";

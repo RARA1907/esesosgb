@@ -353,7 +353,7 @@
         .global-header {
             padding: 18px 22px 14px !important;
             margin-bottom: 0 !important;
-            background: linear-gradient(135deg, #047857 0%, #059669 58%, #0f766e 100%) !important;
+            background: linear-gradient(135deg, rgba(15,23,42,.98), rgba(30,64,175,.92)) !important;
             color: white;
             border-bottom: 0 !important;
         }
@@ -649,61 +649,6 @@
         .worker-count-link { display:inline-flex !important; align-items:center !important; justify-content:center !important; min-width:56px !important; min-height:28px !important; padding:5px 9px !important; line-height:1.1 !important; border-radius:999px !important; text-decoration:none !important; }
         .page-desc { max-width: none !important; }
 
-    
-
-        /* v26.3 targeted layout fixes */
-        .global-header {
-            background: linear-gradient(135deg, #047857 0%, #059669 58%, #0f766e 100%) !important;
-        }
-        .global-header .nav-btn.active-page {
-            color: #065f46 !important;
-        }
-        .global-header .logo-badge { display: none !important; }
-        .card > p,
-        .card > .page-desc {
-            margin-left: 22px !important;
-            margin-right: 22px !important;
-            max-width: 900px;
-        }
-        table, thead, tbody, tr, th, td,
-        table input, table select, table button, table a, table span, table small, table code {
-            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif !important;
-        }
-        table { table-layout: auto; }
-        th.sortable-th {
-            cursor: pointer;
-            user-select: none;
-            white-space: nowrap;
-        }
-        th.sortable-th::after {
-            content: " ⇅";
-            opacity: .45;
-            font-size: 11px;
-        }
-        th.sortable-th.sort-asc::after { content: " ↑"; opacity: .9; }
-        th.sortable-th.sort-desc::after { content: " ↓"; opacity: .9; }
-        .table-filter-row th {
-            padding: 6px 8px !important;
-            background: rgba(248,250,252,.96) !important;
-        }
-        .table-filter-input {
-            width: 100%;
-            box-sizing: border-box;
-            border: 1px solid rgba(203,213,225,.9);
-            border-radius: 8px;
-            padding: 6px 8px;
-            font-size: 12px;
-            background: #fff;
-            color: var(--text-main);
-            min-width: 70px;
-        }
-        .table-filter-input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(5,150,105,.10);
-        }
-        .table-container, .table-wrapper, .panel { overflow-x: auto; }
-
     </style>
 </head>
 <body>
@@ -844,6 +789,18 @@
     window.onload = async function() {
         const { data: { session } } = await dbClient.auth.getSession();
         if (!session) { window.location.href = "login.html"; return; }
+        const email = (session.user.email || '').toLowerCase();
+        const { data: staff, error: staffError } = await dbClient
+            .from('osgb_staff')
+            .select('*, tenants(id, name, slug, logo_url, primary_color, is_active)')
+            .ilike('email', email)
+            .maybeSingle();
+        if (staffError || !staff || staff.can_login === false) {
+            await dbClient.auth.signOut();
+            window.location.href = "login.html";
+            return;
+        }
+        window.CURRENT_AUTH = { session, email, role: staff.access_role || 'uzman', staff, tenant_id: staff.tenant_id, tenant: staff.tenants };
         document.body.style.display = "block";
 
         const urlParams = new URLSearchParams(window.location.search);
@@ -858,7 +815,7 @@
     };
 
     async function fetchCompanyProfile(id) {
-        const { data } = await dbClient.from('customer_companies').select('*').eq('id', id).single();
+        const { data } = await dbClient.from('customer_companies').select('*').eq('tenant_id', window.CURRENT_AUTH.tenant_id).eq('id', id).single();
         if (data) {
             currentCompanyName = data.company_name;
             document.getElementById('lbl_company_name').innerText = data.company_name;
@@ -870,7 +827,7 @@
 
     async function fetchCompanyRisks(id) {
         const tbody = document.getElementById('company_risk_tbody');
-        const { data, error } = await dbClient.from('risk_assessments').select('*').eq('company_id', id).order('created_at', { ascending: false });
+        const { data, error } = await dbClient.from('risk_assessments').select('*').eq('tenant_id', window.CURRENT_AUTH.tenant_id).eq('company_id', id).order('created_at', { ascending: false });
         if (error) { tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#b91c1c;">Hata: ${escapeHtml(error.message)}</td></tr>`; return; }
         if (!data || data.length === 0) {
             tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#94a3b8;">Kayıtlı DÖF / risk bulgusu yok.</td></tr>`;
@@ -919,7 +876,7 @@
 
     async function fetchCompanySchedules(id) {
         const tbody = document.getElementById('company_schedule_tbody');
-        const { data, error } = await dbClient.from('field_schedules').select('*').eq('company_id', id).order('visit_date', { ascending: false });
+        const { data, error } = await dbClient.from('field_schedules').select('*').eq('tenant_id', window.CURRENT_AUTH.tenant_id).eq('company_id', id).order('visit_date', { ascending: false });
         if (error) { tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#b91c1c;">Hata: ${escapeHtml(error.message)}</td></tr>`; return; }
         if (!data || data.length === 0) { tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#94a3b8;">Ziyaret kaydı bulunmuyor.</td></tr>`; return; }
         tbody.innerHTML = '';
@@ -930,7 +887,7 @@
 
     async function fetchCompanyMedical(id) {
         const tbody = document.getElementById('company_medical_tbody');
-        const { data, error } = await dbClient.from('worker_medical_records').select('*').eq('company_id', id).order('created_at', { ascending: false });
+        const { data, error } = await dbClient.from('worker_medical_records').select('*').eq('tenant_id', window.CURRENT_AUTH.tenant_id).eq('company_id', id).order('created_at', { ascending: false });
         if (error) { tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#b91c1c;">Hata: ${escapeHtml(error.message)}</td></tr>`; return; }
         if (!data || data.length === 0) { tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#94a3b8;">Sağlık muayene kaydı yok.</td></tr>`; return; }
         tbody.innerHTML = '';
