@@ -749,6 +749,13 @@
             .portfolio-grid, .summary-band { grid-template-columns: 1fr !important; }
         }
 
+
+        .health-alert-grid { grid-template-columns: repeat(3, minmax(190px, 1fr)) !important; }
+        .health-alert-panel { margin-top: 4px !important; margin-bottom: 18px !important; }
+        @media (max-width: 900px) {
+            .health-alert-grid { grid-template-columns: 1fr !important; }
+        }
+
     </style>
 </head>
 <body>
@@ -803,6 +810,42 @@
         <div class="summary-item"><span>Aktif DÖF takipte</span><strong id="stat_active_dofs_band">0</strong><small>Açık + devam eden kayıt</small></div>
         <div class="summary-item"><span>Bu ay planlı saha ziyareti</span><strong id="stat_month_visits">0</strong><small>Takvimde yer alan ziyaret</small></div>
         <div class="summary-item"><span>Saha planlama yoğunluğu</span><strong id="stat_schedule_density">-</strong><small>Bu ay / aktif firma oranı</small></div>
+    </div>
+
+
+    <div class="section-title">🩺 İş Sağlığı Uyarıları</div>
+    <div class="kpi-grid health-alert-grid">
+        <div class="metric-box metric-red clickable" onclick="window.location.href='medical.html'">
+            <div class="metric-title">Geciken Tetkik Takibi</div>
+            <div class="metric-value" id="stat_overdue_medical_tests">0</div>
+            <div class="metric-sub">Kontrol tarihi geçmiş tetkik</div>
+        </div>
+        <div class="metric-box metric-amber clickable" onclick="window.location.href='medical.html'">
+            <div class="metric-title">Bugün / Bu Hafta Yaklaşan Aşı ve Kronik Takip</div>
+            <div class="metric-value" id="stat_upcoming_health_followups">0</div>
+            <div class="metric-sub">Önümüzdeki 7 gün</div>
+        </div>
+        <div class="metric-box metric-purple clickable" onclick="window.location.href='medical.html'">
+            <div class="metric-title">Referans Dışı Tetkik</div>
+            <div class="metric-value" id="stat_abnormal_medical_tests">0</div>
+            <div class="metric-sub">Hekim kontrolü gerektirir</div>
+        </div>
+    </div>
+
+    <div class="panel health-alert-panel">
+        <h3>🩺 Kritik Sağlık Uyarıları</h3>
+        <p>Geciken tetkikler, yaklaşan aşı/kronik takipler ve referans dışı sonuçlar.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Uyarı</th>
+                    <th>Firma / Çalışan</th>
+                    <th>Tarih</th>
+                    <th>Durum</th>
+                </tr>
+            </thead>
+            <tbody id="health_alerts_tbody"><tr><td colspan="4" class="empty-state">Sağlık uyarıları yükleniyor...</td></tr></tbody>
+        </table>
     </div>
 
     <div id="operational_banner" class="operational-banner op-good" onclick="window.location.href='actions.html'">
@@ -1046,6 +1089,65 @@
         return text.length > limit ? text.substring(0, limit) + '...' : text;
     }
 
+
+    function addDaysString(baseDateString, days) {
+        const d = baseDateString ? new Date(baseDateString + 'T00:00:00') : new Date();
+        d.setDate(d.getDate() + days);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+
+    function escapeHtml(value) {
+        return (value || '').toString().replace(/[&<>'"]/g, function (char) {
+            return {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                "'": '&#39;',
+                '"': '&quot;'
+            }[char];
+        });
+    }
+
+    function normalizeHealthText(value) {
+        return (value || '').toString().trim().toLowerCase()
+            .replace(/ı/g, 'i')
+            .replace(/İ/g, 'i')
+            .replace(/ğ/g, 'g')
+            .replace(/ü/g, 'u')
+            .replace(/ş/g, 's')
+            .replace(/ö/g, 'o')
+            .replace(/ç/g, 'c');
+    }
+
+    function isAbnormalTest(test) {
+        const status = normalizeHealthText(test.result_status || test.status || '');
+        return status.includes('referans disi') || status.includes('referans') || status.includes('anormal');
+    }
+
+    function isActiveHealthFollowup(followup) {
+        const status = normalizeHealthText(followup.status || followup.followup_status || 'aktif');
+        return !(status.includes('tamam') || status.includes('pasif') || status.includes('iptal'));
+    }
+
+    function isVaccineOrChronicFollowup(followup) {
+        const type = normalizeHealthText(followup.followup_type || followup.type || followup.category || '');
+        const title = normalizeHealthText(followup.title || followup.followup_title || '');
+        const combined = `${type} ${title}`;
+        return combined.includes('asi') || combined.includes('kronik') || combined.includes('diyabet') || combined.includes('hipertansiyon');
+    }
+
+    function getCompanyNameById(companies, companyId) {
+        const c = (companies || []).find(item => String(item.id) === String(companyId));
+        return c && c.company_name ? c.company_name : 'Bilinmeyen Firma';
+    }
+
+    function getWorkerText(row) {
+        return row.worker_name || row.worker_full_name || row.worker_id || '-';
+    }
+
     async function fetchDashboardStats(authContext) {
         try {
             const auth = authContext || CURRENT_AUTH || window.__CURRENT_AUTH_CONTEXT__;
@@ -1055,10 +1157,10 @@
             const today = todayString();
             const { start, end } = currentMonthRange();
 
-            const [companiesRes, workersRes, risksRes, visitsRes] = await Promise.all([
+            const [companiesRes, workersRes, risksRes, visitsRes, medicalTestsRes, healthFollowupsRes] = await Promise.all([
                 dbClient
                     .from('customer_companies')
-                    .select('id, danger_class')
+                    .select('id, company_name, danger_class')
                     .eq('tenant_id', tenantId),
 
                 dbClient
@@ -1080,17 +1182,31 @@
                     .eq('customer_companies.tenant_id', tenantId)
                     .gte('visit_date', start)
                     .lt('visit_date', end)
-                    .order('visit_date', { ascending: true })
+                    .order('visit_date', { ascending: true }),
+
+                dbClient
+                    .from('worker_medical_tests')
+                    .select('*')
+                    .eq('tenant_id', tenantId),
+
+                dbClient
+                    .from('worker_health_followups')
+                    .select('*')
+                    .eq('tenant_id', tenantId)
             ]);
 
             if (companiesRes.error) throw companiesRes.error;
             if (workersRes.error) throw workersRes.error;
             if (risksRes.error) throw risksRes.error;
             if (visitsRes.error) throw visitsRes.error;
+            if (medicalTestsRes.error) throw medicalTestsRes.error;
+            if (healthFollowupsRes.error) throw healthFollowupsRes.error;
 
             const companies = companiesRes.data || [];
             const risks = risksRes.data || [];
             const visits = visitsRes.data || [];
+            const medicalTests = medicalTestsRes.data || [];
+            const healthFollowups = healthFollowupsRes.data || [];
             const workerCount = workersRes.count || 0;
 
             const cokCount = companies.filter(c => (c.danger_class || '').toString().trim().toLowerCase() === 'çok tehlikeli').length;
@@ -1106,6 +1222,17 @@
             const activeDofs = openDofs + progressDofs;
             const scheduleDensity = companies.length > 0 ? Math.round((visits.length / companies.length) * 100) + '%' : '-';
 
+            const weekEnd = addDaysString(today, 7);
+            const overdueMedicalTests = medicalTests.filter(t => t.next_control_date && t.next_control_date < today).length;
+            const abnormalMedicalTests = medicalTests.filter(t => isAbnormalTest(t)).length;
+            const upcomingHealthFollowups = healthFollowups.filter(f =>
+                isActiveHealthFollowup(f) &&
+                isVaccineOrChronicFollowup(f) &&
+                f.next_followup_date &&
+                f.next_followup_date >= today &&
+                f.next_followup_date <= weekEnd
+            ).length;
+
             setDashValue('stat_danger_cok', cokCount);
             setDashValue('stat_danger_tehlike', tehlikeCount);
             setDashValue('stat_danger_az', azCount);
@@ -1119,6 +1246,11 @@
             setDashValue('stat_month_visits', visits.length);
             setDashValue('stat_active_dofs_band', activeDofs);
             setDashValue('stat_schedule_density', scheduleDensity);
+            setDashValue('stat_overdue_medical_tests', overdueMedicalTests);
+            setDashValue('stat_upcoming_health_followups', upcomingHealthFollowups);
+            setDashValue('stat_abnormal_medical_tests', abnormalMedicalTests);
+
+            renderHealthAlerts(medicalTests, healthFollowups, companies, today, weekEnd);
 
             updateOperationalBanner(overdueDofs, openDofs, progressDofs);
             renderPriorityDofs(activeRisks, today);
@@ -1129,7 +1261,87 @@
             if (dofEl) dofEl.innerHTML = `<tr><td colspan="4" class="empty-state" style="color:#b91c1c;">Dashboard verileri yüklenemedi: ${err.message}</td></tr>`;
             const visitEl = document.getElementById('month_visits_tbody');
             if (visitEl) visitEl.innerHTML = '<tr><td colspan="3" class="empty-state" style="color:#b91c1c;">Ziyaretler yüklenemedi.</td></tr>';
+            const healthEl = document.getElementById('health_alerts_tbody');
+            if (healthEl) healthEl.innerHTML = '<tr><td colspan="4" class="empty-state" style="color:#b91c1c;">Sağlık uyarıları yüklenemedi.</td></tr>';
         }
+    }
+
+
+    function renderHealthAlerts(medicalTests, healthFollowups, companies, today, weekEnd) {
+        const tbody = document.getElementById('health_alerts_tbody');
+        if (!tbody) return;
+
+        const alerts = [];
+
+        (medicalTests || []).forEach(t => {
+            const companyName = getCompanyNameById(companies, t.company_id);
+            const workerText = getWorkerText(t);
+            if (isAbnormalTest(t)) {
+                alerts.push({
+                    priority: 1,
+                    label: 'Referans dışı tetkik',
+                    companyName,
+                    workerText,
+                    date: t.result_date || t.created_at || '-',
+                    badge: '<span class="badge badge-red">Referans dışı</span>'
+                });
+            }
+            if (t.next_control_date && t.next_control_date < today) {
+                alerts.push({
+                    priority: 2,
+                    label: 'Geciken tetkik takibi',
+                    companyName,
+                    workerText,
+                    date: t.next_control_date,
+                    badge: '<span class="badge badge-red">Gecikti</span>'
+                });
+            }
+        });
+
+        (healthFollowups || []).forEach(f => {
+            if (!isActiveHealthFollowup(f) || !isVaccineOrChronicFollowup(f) || !f.next_followup_date) return;
+            const companyName = getCompanyNameById(companies, f.company_id);
+            const workerText = getWorkerText(f);
+            const title = f.title || f.followup_title || f.followup_type || 'Aşı / kronik takip';
+            if (f.next_followup_date < today) {
+                alerts.push({
+                    priority: 3,
+                    label: `Geciken ${title}`,
+                    companyName,
+                    workerText,
+                    date: f.next_followup_date,
+                    badge: '<span class="badge badge-red">Gecikti</span>'
+                });
+            } else if (f.next_followup_date <= weekEnd) {
+                alerts.push({
+                    priority: 4,
+                    label: `Yaklaşan ${title}`,
+                    companyName,
+                    workerText,
+                    date: f.next_followup_date,
+                    badge: '<span class="badge badge-orange">Bu hafta</span>'
+                });
+            }
+        });
+
+        alerts.sort((a, b) => a.priority - b.priority || String(a.date || '').localeCompare(String(b.date || '')));
+        const list = alerts.slice(0, 7);
+
+        if (list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Kritik sağlık uyarısı yok.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = '';
+        list.forEach(a => {
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${escapeHtml(a.label)}</strong></td>
+                    <td>${escapeHtml(a.companyName)}<br><small style="color:var(--text-muted);">${escapeHtml(a.workerText)}</small></td>
+                    <td>${escapeHtml(a.date || '-')}</td>
+                    <td>${a.badge}<br><a class="small-link" href="medical.html">Aç</a></td>
+                </tr>`;
+        });
     }
 
     function updateOperationalBanner(overdue, open, progress) {
