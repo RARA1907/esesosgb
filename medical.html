@@ -637,6 +637,35 @@
         .worker-count-link { display:inline-flex !important; align-items:center !important; justify-content:center !important; min-width:56px !important; min-height:28px !important; padding:5px 9px !important; line-height:1.1 !important; border-radius:999px !important; text-decoration:none !important; }
         .page-desc { max-width: none !important; }
 
+
+        /* Hekim Sağlık Kartı tablo filtreleme ve sıralama */
+        .sortable-th {
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+        .sortable-th:hover { color: var(--primary); }
+        .sort-indicator {
+            font-size: 10px;
+            margin-left: 4px;
+            opacity: 0.75;
+        }
+        .medical-filter-row th {
+            background: var(--bg-card) !important;
+            padding: 6px 8px !important;
+        }
+        .medical-filter-input {
+            width: 100%;
+            min-width: 80px;
+            padding: 7px 8px !important;
+            font-size: 12px !important;
+            border-radius: 8px !important;
+        }
+        .medical-filter-input::placeholder {
+            color: var(--text-muted);
+            opacity: 0.75;
+        }
+
     </style>
 </head>
 <body>
@@ -703,10 +732,16 @@
         <table>
             <thead>
                 <tr>
-                    <th>Firma Unvanı</th>
-                    <th>Çalışan Adı (Yaş/Cinsiyet)</th>
-                    <th>Klinik Bulgular (Göz/Kalp)</th>
-                    <th>Hekim Kararı</th>
+                    <th class="sortable-th" onclick="sortMedicalBy('company_name')">Firma Unvanı <span id="sort_company_name" class="sort-indicator"></span></th>
+                    <th class="sortable-th" onclick="sortMedicalBy('worker_name')">Çalışan Adı (Yaş/Cinsiyet) <span id="sort_worker_name" class="sort-indicator"></span></th>
+                    <th class="sortable-th" onclick="sortMedicalBy('clinical_text')">Klinik Bulgular (Göz/Kalp) <span id="sort_clinical_text" class="sort-indicator"></span></th>
+                    <th class="sortable-th" onclick="sortMedicalBy('final_decision')">Hekim Kararı <span id="sort_final_decision" class="sort-indicator"></span></th>
+                </tr>
+                <tr class="medical-filter-row">
+                    <th><input class="medical-filter-input" data-field="company_name" oninput="applyMedicalFilters()" placeholder="Firma filtrele"></th>
+                    <th><input class="medical-filter-input" data-field="worker_text" oninput="applyMedicalFilters()" placeholder="Ad / yaş / cinsiyet"></th>
+                    <th><input class="medical-filter-input" data-field="clinical_text" oninput="applyMedicalFilters()" placeholder="Göz / kalp / kas"></th>
+                    <th><input class="medical-filter-input" data-field="final_decision" oninput="applyMedicalFilters()" placeholder="Karar filtrele"></th>
                 </tr>
             </thead>
             <tbody id="medical_table_body"><tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Veriler yükleniyor...</td></tr></tbody>
@@ -718,6 +753,10 @@
     const SUPABASE_URL = "https://dnvuizausfcjzkcsynql.supabase.co";
     const SUPABASE_KEY = "sb_publishable_LtrytF9wyS3u-KgSZk7heg_SZc7hhoY";
     const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    let CURRENT_AUTH = null;
+    let medicalTableRows = [];
+    let medicalSortField = '';
+    let medicalSortDirection = 'asc';
 
     // 🔐 GERÇEK ROL / ERİŞİM YARDIMCILARI
     // Öncelik: osgb_staff.access_role + can_login + aktiflik bilgisi.
@@ -858,8 +897,19 @@
 
         const auth = await requireAuthAndRole('medical');
         if (!auth) return;
+
+        CURRENT_AUTH = auth;
+
+        if (!CURRENT_AUTH.tenant_id) {
+            alert('Bu kullanıcı herhangi bir tenant ile ilişkilendirilmemiş. Lütfen personel kaydını kontrol edin.');
+            await dbClient.auth.signOut();
+            window.location.href = 'login.html';
+            return;
+        }
+
         document.body.style.display = "block";
-        await fetchCompaniesToSelect(); fetchMedicalRecords();
+        await fetchCompaniesToSelect();
+        fetchMedicalRecords();
     };
 
     function checkMedicalLawConstraint() {
@@ -871,29 +921,249 @@
 
     async function fetchCompaniesToSelect() {
         const select = document.getElementById('company_select');
-        const { data } = await dbClient.from('customer_companies').select('id, company_name').order('company_name');
+
+        if (!CURRENT_AUTH || !CURRENT_AUTH.tenant_id) {
+            select.innerHTML = '<option value="">Tenant bilgisi bulunamadı</option>';
+            return;
+        }
+
+        const { data, error } = await dbClient
+            .from('customer_companies')
+            .select('id, company_name, tenant_id')
+            .eq('tenant_id', CURRENT_AUTH.tenant_id)
+            .order('company_name');
+
+        if (error) {
+            console.error('Firma listesi alınamadı:', error);
+            select.innerHTML = '<option value="">Firma listesi alınamadı</option>';
+            return;
+        }
+
         select.innerHTML = '<option value="">-- Lütfen Firma Seçin --</option>';
-        if (data) { data.forEach(c => { select.innerHTML += `<option value="${c.id}">${c.company_name}</option>`; }); }
+        if (data) {
+            data.forEach(c => {
+                select.innerHTML += `<option value="${c.id}">${escapeHtml(c.company_name)}</option>`;
+            });
+        }
     }
 
     async function fetchMedicalRecords() {
         const tbody = document.getElementById('medical_table_body');
-        const { data } = await dbClient.from('worker_medical_records').select('*, customer_companies(company_name)').order('created_at', { ascending: false });
-        tbody.innerHTML = '';
-        if (!data || data.length === 0) { tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Kayıtlı muayene kartı bulunmuyor.</td></tr>`; return; }
-        data.forEach(m => {
+
+        if (!CURRENT_AUTH || !CURRENT_AUTH.tenant_id) {
+            medicalTableRows = [];
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#b91c1c;">Tenant bilgisi bulunamadı.</td></tr>`;
+            return;
+        }
+
+        const { data, error } = await dbClient
+            .from('worker_medical_records')
+            .select('*, customer_companies!inner(company_name, tenant_id)')
+            .eq('tenant_id', CURRENT_AUTH.tenant_id)
+            .eq('customer_companies.tenant_id', CURRENT_AUTH.tenant_id)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            medicalTableRows = [];
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:red;">Hata: ${error.message}</td></tr>`;
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            medicalTableRows = [];
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Kayıtlı muayene kartı bulunmuyor.</td></tr>`;
+            return;
+        }
+
+        medicalTableRows = data.map(m => {
             const compName = m.customer_companies ? m.customer_companies.company_name : 'Bilinmeyen Firma';
-            tbody.innerHTML += `<tr><td><strong>${compName}</strong></td><td>${m.worker_name || 'Belirtilmedi'} (${m.worker_age || '-'} / ${m.worker_gender || '-'})</td><td>👁️ ${m.goz_secure || '-'} <br> ❤️ ${m.kalp_secure || '-'}</td><td><span class="badge-decision">${m.final_decision}</span></td></tr>`;
+            const workerAge = m.worker_age !== null && m.worker_age !== undefined ? Number(m.worker_age) : '';
+            const workerGender = m.worker_gender || '';
+            const workerName = m.worker_name || 'Belirtilmedi';
+            const goz = m.goz_secure || '';
+            const kalp = m.kalp_secure || '';
+            const kas = m.kas_secure || '';
+            const decision = m.final_decision || '';
+
+            return {
+                id: m.id,
+                company_name: compName,
+                worker_name: workerName,
+                worker_age: workerAge,
+                worker_gender: workerGender,
+                worker_text: `${workerName} ${workerAge} ${workerGender}`,
+                goz_secure: goz,
+                kalp_secure: kalp,
+                kas_secure: kas,
+                clinical_text: `${goz} ${kalp} ${kas}`,
+                final_decision: decision
+            };
+        });
+
+        renderMedicalTable();
+    }
+
+    function escapeHtml(value) {
+        return (value || '').toString().replace(/[&<>'"]/g, function (char) {
+            return {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                "'": '&#39;',
+                '"': '&quot;'
+            }[char];
+        });
+    }
+
+    function getMedicalFilteredRows() {
+        const filters = {};
+
+        document.querySelectorAll('.medical-filter-input').forEach(input => {
+            const field = input.dataset.field;
+            const value = (input.value || '').toString().trim().toLowerCase();
+            if (field && value) filters[field] = value;
+        });
+
+        let rows = [...medicalTableRows];
+
+        Object.keys(filters).forEach(field => {
+            const value = filters[field];
+            rows = rows.filter(row => {
+                const cellValue = row[field] !== undefined && row[field] !== null
+                    ? row[field].toString().toLowerCase()
+                    : '';
+                return cellValue.includes(value);
+            });
+        });
+
+        if (medicalSortField) {
+            rows.sort((a, b) => {
+                const av = a[medicalSortField];
+                const bv = b[medicalSortField];
+
+                if (typeof av === 'number' && typeof bv === 'number') {
+                    return medicalSortDirection === 'asc' ? av - bv : bv - av;
+                }
+
+                return medicalSortDirection === 'asc'
+                    ? (av || '').toString().localeCompare((bv || '').toString(), 'tr')
+                    : (bv || '').toString().localeCompare((av || '').toString(), 'tr');
+            });
+        }
+
+        return rows;
+    }
+
+    function renderMedicalTable() {
+        const tbody = document.getElementById('medical_table_body');
+        const rows = getMedicalFilteredRows();
+
+        updateMedicalSortIndicators();
+
+        if (!rows || rows.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Filtreye uygun muayene kartı bulunamadı.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = '';
+
+        rows.forEach(m => {
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${escapeHtml(m.company_name)}</strong></td>
+                    <td>${escapeHtml(m.worker_name)} (${escapeHtml(m.worker_age || '-')} / ${escapeHtml(m.worker_gender || '-')})</td>
+                    <td>👁️ ${escapeHtml(m.goz_secure || '-')} <br> ❤️ ${escapeHtml(m.kalp_secure || '-')}</td>
+                    <td><span class="badge-decision">${escapeHtml(m.final_decision || '-')}</span></td>
+                </tr>
+            `;
+        });
+    }
+
+    function applyMedicalFilters() {
+        renderMedicalTable();
+    }
+
+    function sortMedicalBy(field) {
+        if (medicalSortField === field) {
+            medicalSortDirection = medicalSortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            medicalSortField = field;
+            medicalSortDirection = 'asc';
+        }
+
+        renderMedicalTable();
+    }
+
+    function updateMedicalSortIndicators() {
+        const fields = ['company_name', 'worker_name', 'clinical_text', 'final_decision'];
+
+        fields.forEach(field => {
+            const el = document.getElementById(`sort_${field}`);
+            if (!el) return;
+            el.innerText = field === medicalSortField
+                ? (medicalSortDirection === 'asc' ? '▲' : '▼')
+                : '';
         });
     }
 
     async function saveMedical() {
-        const compId = document.getElementById('company_select').value; const wName = document.getElementById('worker_name').value;
-        const wAge = parseInt(document.getElementById('worker_age').value); const wGender = document.getElementById('worker_gender').value;
-        const gozVal = document.getElementById('goz').value; const kalpVal = document.getElementById('kalp').value; const kasVal = document.getElementById('kas').value; const decisionVal = document.getElementById('decision').value;
-        if(!compId || !wName || !wAge || !gozVal || !kalpVal || !kasVal) { alert("Lütfen gerekli alanları doldurun!"); return; }
-        await dbClient.from('worker_medical_records').insert([{ company_id: compId, worker_name: wName, worker_age: wAge, worker_gender: wGender, goz_secure: gozVal, kalp_secure: kalpVal, kas_secure: kasVal, final_decision: decisionVal }]);
-        document.getElementById('worker_name').value = ''; document.getElementById('worker_age').value = ''; document.getElementById('goz').value = ''; document.getElementById('kalp').value = ''; document.getElementById('kas').value = ''; document.getElementById('law_warning').style.display = 'none'; fetchMedicalRecords();
+        const compId = document.getElementById('company_select').value;
+        const wName = document.getElementById('worker_name').value;
+        const wAge = parseInt(document.getElementById('worker_age').value);
+        const wGender = document.getElementById('worker_gender').value;
+        const gozVal = document.getElementById('goz').value;
+        const kalpVal = document.getElementById('kalp').value;
+        const kasVal = document.getElementById('kas').value;
+        const decisionVal = document.getElementById('decision').value;
+
+        if (!CURRENT_AUTH || !CURRENT_AUTH.tenant_id) {
+            alert('Tenant bilgisi bulunamadı.');
+            return;
+        }
+
+        if(!compId || !wName || !wAge || !gozVal || !kalpVal || !kasVal) {
+            alert("Lütfen gerekli alanları doldurun!");
+            return;
+        }
+
+        const { data: companyCheck, error: companyCheckError } = await dbClient
+            .from('customer_companies')
+            .select('id')
+            .eq('id', compId)
+            .eq('tenant_id', CURRENT_AUTH.tenant_id)
+            .maybeSingle();
+
+        if (companyCheckError || !companyCheck) {
+            alert('Seçilen firma bu tenant altında bulunamadı.');
+            return;
+        }
+
+        const { error } = await dbClient
+            .from('worker_medical_records')
+            .insert([{
+                tenant_id: CURRENT_AUTH.tenant_id,
+                company_id: compId,
+                worker_name: wName,
+                worker_age: wAge,
+                worker_gender: wGender,
+                goz_secure: gozVal,
+                kalp_secure: kalpVal,
+                kas_secure: kasVal,
+                final_decision: decisionVal
+            }]);
+
+        if (error) {
+            alert('Sağlık kartı kaydedilemedi: ' + error.message);
+            return;
+        }
+
+        document.getElementById('worker_name').value = '';
+        document.getElementById('worker_age').value = '';
+        document.getElementById('goz').value = '';
+        document.getElementById('kalp').value = '';
+        document.getElementById('kas').value = '';
+        document.getElementById('law_warning').style.display = 'none';
+        fetchMedicalRecords();
     }
     async function handleLogout() { await dbClient.auth.signOut(); window.location.href = "login.html"; }
 </script>
