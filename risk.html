@@ -662,7 +662,40 @@
         tbody td { padding: 9px 11px !important; }
         .worker-count-link { display:inline-flex !important; align-items:center !important; justify-content:center !important; min-width:56px !important; min-height:28px !important; padding:5px 9px !important; line-height:1.1 !important; border-radius:999px !important; text-decoration:none !important; }
         .page-desc { max-width: none !important; }
+/* Uzman Risk Motoru tablo filtreleme ve sıralama */
+.sortable-th {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+}
 
+.sortable-th:hover {
+    color: var(--primary);
+}
+
+.sort-indicator {
+    font-size: 10px;
+    margin-left: 4px;
+    opacity: 0.75;
+}
+
+.risk-filter-row th {
+    background: var(--bg-card) !important;
+    padding: 6px 8px !important;
+}
+
+.risk-filter-input {
+    width: 100%;
+    min-width: 70px;
+    padding: 7px 8px !important;
+    font-size: 12px !important;
+    border-radius: 8px !important;
+}
+
+.risk-filter-input::placeholder {
+    color: var(--text-muted);
+    opacity: 0.75;
+}
     </style>
 </head>
 <body>
@@ -826,17 +859,27 @@
         <h3>📋 Sahadaki Risk Bulguları Takip Matrisi (Canlı)</h3>
         <table>
             <thead>
-                <tr>
-                    <th>Firma Unvanı</th>
-                    <th>Tehlike / Önerilen Önlem</th>
-                    <th>Sorumlu</th>
-                    <th>Foto</th>
-                    <th>Skor</th>
-                    <th>Risk / DÖF Durumu</th>
-                    <th>Termin</th>
-                    <th>Aksiyon</th>
-                </tr>
-            </thead>
+    <tr>
+        <th class="sortable-th" onclick="sortRisksBy('company_name')">Firma Unvanı <span id="sort_company_name" class="sort-indicator"></span></th>
+        <th class="sortable-th" onclick="sortRisksBy('hazard_title')">Tehlike / Önerilen Önlem <span id="sort_hazard_title" class="sort-indicator"></span></th>
+        <th class="sortable-th" onclick="sortRisksBy('responsible_person')">Sorumlu <span id="sort_responsible_person" class="sort-indicator"></span></th>
+        <th class="sortable-th" onclick="sortRisksBy('has_photo')">Foto <span id="sort_has_photo" class="sort-indicator"></span></th>
+        <th class="sortable-th" onclick="sortRisksBy('risk_score')">Skor <span id="sort_risk_score" class="sort-indicator"></span></th>
+        <th class="sortable-th" onclick="sortRisksBy('status')">Risk / DÖF Durumu <span id="sort_status" class="sort-indicator"></span></th>
+        <th class="sortable-th" onclick="sortRisksBy('target_date')">Termin <span id="sort_target_date" class="sort-indicator"></span></th>
+        <th>Aksiyon</th>
+    </tr>
+    <tr class="risk-filter-row">
+        <th><input class="risk-filter-input" data-field="company_name" oninput="applyRiskFilters()" placeholder="Firma"></th>
+        <th><input class="risk-filter-input" data-field="hazard_text" oninput="applyRiskFilters()" placeholder="Tehlike / önlem"></th>
+        <th><input class="risk-filter-input" data-field="responsible_person" oninput="applyRiskFilters()" placeholder="Sorumlu"></th>
+        <th><input class="risk-filter-input" data-field="photo_text" oninput="applyRiskFilters()" placeholder="Var/Yok"></th>
+        <th><input class="risk-filter-input" data-field="risk_score" oninput="applyRiskFilters()" placeholder="Skor"></th>
+        <th><input class="risk-filter-input" data-field="status_text" oninput="applyRiskFilters()" placeholder="Durum"></th>
+        <th><input class="risk-filter-input" data-field="target_date" oninput="applyRiskFilters()" placeholder="Termin"></th>
+        <th></th>
+    </tr>
+</thead>
             <tbody id="risk_table_body"><tr><td colspan="8" style="text-align:center; color:var(--text-muted);">Veriler yükleniyor...</td></tr></tbody>
         </table>
     </div>
@@ -1059,6 +1102,10 @@
     ];
 
     let lastLoadedCompanies = [];
+    let CURRENT_AUTH = null;
+let riskTableRows = [];
+let riskSortField = '';
+let riskSortDirection = 'asc';
 
     function normalizeTextForMatch(value) {
         return String(value || '').toLocaleLowerCase('tr-TR');
@@ -1173,10 +1220,22 @@
         const activeTheme = localStorage.getItem('selected_theme') || 'isgm';
         if (themes[activeTheme]) { Object.keys(themes[activeTheme]).forEach(key => { document.documentElement.style.setProperty(key, themes[activeTheme][key]); }); }
 
-        const auth = await requireAuthAndRole('risk');
-        if (!auth) return;
-        document.body.style.display = "block";
-        calculateFineKinney(); await fetchCompaniesToSelect(); fetchRisks();
+const auth = await requireAuthAndRole('risk');
+if (!auth) return;
+
+CURRENT_AUTH = auth;
+
+if (!CURRENT_AUTH.tenant_id) {
+    alert('Bu kullanıcı herhangi bir tenant ile ilişkilendirilmemiş. Lütfen personel kaydını kontrol edin.');
+    await dbClient.auth.signOut();
+    window.location.href = 'login.html';
+    return;
+}
+
+document.body.style.display = "block";
+calculateFineKinney();
+await fetchCompaniesToSelect();
+fetchRisks();
         updateConnectionStatus(); updateOfflineRiskCount(); registerServiceWorker();
         if (navigator.onLine && window.OSGBRiskSync) { window.OSGBRiskSync.syncPendingRisks(); }
     };
@@ -1218,49 +1277,66 @@
         el.style.color = color || 'var(--text-muted)';
     }
 
-    async function loadCompaniesFromCache() {
-        if (!window.OSGBOfflineDB || !window.OSGBOfflineDB.getCompanies) return false;
-        const cachedCompanies = await window.OSGBOfflineDB.getCompanies();
-        const meta = await window.OSGBOfflineDB.getCompanyCacheMeta();
-
-        if (cachedCompanies && cachedCompanies.length > 0) {
-            renderCompanyOptions(cachedCompanies, '-- Offline firma listesinden seçim yapın --');
-            setCompanyCacheStatus(`Firma listesi cihazdan yüklendi. ${cachedCompanies.length} firma. Son güncelleme: ${formatCacheDate(meta && meta.updated_at)}`, '#c2410c');
-            return true;
-        }
-
-        renderCompanyOptions([], '-- Firma listesi cihazda yok --');
-        setCompanyCacheStatus('Firma listesi cihazda bulunamadı. Sahaya çıkmadan önce internet varken bu listeyi güncelleyin.', '#b91c1c');
+   async function loadCompaniesFromCache() {
+    if (!CURRENT_AUTH || !CURRENT_AUTH.tenant_id) {
+        renderCompanyOptions([], '-- Tenant bilgisi bulunamadı --');
+        setCompanyCacheStatus('Tenant bilgisi olmadığı için offline firma listesi kullanılmadı.', '#b91c1c');
         return false;
     }
 
-    async function fetchCompaniesToSelect() {
-        if (!navigator.onLine) {
-            await loadCompaniesFromCache();
-            return;
-        }
+    if (!window.OSGBOfflineDB || !window.OSGBOfflineDB.getCompanies) return false;
 
-        try {
-            const { data, error } = await dbClient
-                .from('customer_companies')
-                .select('id, company_name, nace_code, danger_class')
-                .order('company_name');
+    const cachedCompaniesRaw = await window.OSGBOfflineDB.getCompanies();
+    const meta = await window.OSGBOfflineDB.getCompanyCacheMeta();
 
-            if (error) throw error;
+    const cachedCompanies = (cachedCompaniesRaw || []).filter(c => {
+        return c.tenant_id && String(c.tenant_id) === String(CURRENT_AUTH.tenant_id);
+    });
 
-            renderCompanyOptions(data || [], '-- Lütfen Firma Seçin --');
-
-            if (window.OSGBOfflineDB && window.OSGBOfflineDB.saveCompanies) {
-                await window.OSGBOfflineDB.saveCompanies(data || []);
-                setCompanyCacheStatus(`Firma listesi Supabase’den güncellendi ve cihaza kaydedildi. ${(data || []).length} firma.`, 'var(--accent-green)');
-            } else {
-                setCompanyCacheStatus('Firma listesi yüklendi; ancak offline veritabanı hazır olmadığı için cihaza kaydedilemedi.', '#c2410c');
-            }
-        } catch (err) {
-            console.warn('Firma listesi Supabase’den çekilemedi, cihaz önbelleği deneniyor:', err.message);
-            await loadCompaniesFromCache();
-        }
+    if (cachedCompanies && cachedCompanies.length > 0) {
+        renderCompanyOptions(cachedCompanies, '-- Offline firma listesinden seçim yapın --');
+        setCompanyCacheStatus(`Tenant firma listesi cihazdan yüklendi. ${cachedCompanies.length} firma. Son güncelleme: ${formatCacheDate(meta && meta.updated_at)}`, '#c2410c');
+        return true;
     }
+
+    renderCompanyOptions([], '-- Bu tenant için cihazda firma listesi yok --');
+    setCompanyCacheStatus('Bu tenant için cihazda firma listesi bulunamadı. İnternet varken firma listesini güncelleyin.', '#b91c1c');
+    return false;
+}
+    async function fetchCompaniesToSelect() {
+    if (!CURRENT_AUTH || !CURRENT_AUTH.tenant_id) {
+        renderCompanyOptions([], '-- Tenant bilgisi bulunamadı --');
+        setCompanyCacheStatus('Tenant bilgisi bulunamadı.', '#b91c1c');
+        return;
+    }
+
+    if (!navigator.onLine) {
+        await loadCompaniesFromCache();
+        return;
+    }
+
+    try {
+        const { data, error } = await dbClient
+            .from('customer_companies')
+            .select('id, company_name, nace_code, danger_class, tenant_id')
+            .eq('tenant_id', CURRENT_AUTH.tenant_id)
+            .order('company_name');
+
+        if (error) throw error;
+
+        renderCompanyOptions(data || [], '-- Lütfen Firma Seçin --');
+
+        if (window.OSGBOfflineDB && window.OSGBOfflineDB.saveCompanies) {
+            await window.OSGBOfflineDB.saveCompanies(data || []);
+            setCompanyCacheStatus(`Firma listesi Supabase’den güncellendi ve cihaza kaydedildi. ${(data || []).length} firma.`, 'var(--accent-green)');
+        } else {
+            setCompanyCacheStatus('Firma listesi yüklendi; ancak offline veritabanı hazır olmadığı için cihaza kaydedilemedi.', '#c2410c');
+        }
+    } catch (err) {
+        console.warn('Firma listesi Supabase’den çekilemedi, cihaz önbelleği deneniyor:', err.message);
+        await loadCompaniesFromCache();
+    }
+}
 
     async function manualRefreshCompanyCache() {
         const statusEl = document.getElementById('company_cache_status');
@@ -1277,57 +1353,297 @@
         await fetchCompaniesToSelect();
     }
 
-    async function fetchRisks() {
-        const tbody = document.getElementById('risk_table_body');
-        const { data } = await dbClient.from('risk_assessments').select('*, customer_companies(company_name)').order('status', { ascending: false }).order('created_at', { ascending: false });
-        tbody.innerHTML = '';
-        if (!data || data.length === 0) { tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">Kayıtlı risk bulgusu yok.</td></tr>`; return; }
-        
-        data.forEach(r => {
-            let badgeColor = '#dcfce7', textColor = '#15803d', lvlText = 'Düşük';
-            if(r.risk_score >= 20 && r.risk_score < 70) { badgeColor = '#ffedd5'; textColor = '#c2410c'; lvlText = 'Olası'; }
-            else if(r.risk_score >= 70 && r.risk_score < 200) { badgeColor = '#fee2e2'; textColor = '#b91c1c'; lvlText = 'Önemli'; }
-            else if(r.risk_score >= 200) { badgeColor = '#f87171'; textColor = '#ffffff'; lvlText = 'ESASLI'; }
+   async function fetchRisks() {
+    const tbody = document.getElementById('risk_table_body');
 
-            const compName = r.customer_companies ? r.customer_companies.company_name : 'Bilinmeyen Firma';
-            const isClosed = r.status === 'Kapalı';
-            const isInProgress = r.status === 'Devam Ediyor';
-            const progressButton = (!isClosed && !isInProgress) ? `<button class="close-btn" style="background:#f97316;" onclick="setRiskInProgress('${r.id}')">Devam Ediyor</button>` : '';
-            const closeButton = isClosed ? '<span style="color:var(--accent-green); font-weight:bold; display:block; margin-bottom:6px;">✓ Giderildi</span>' : `<button class="close-btn" onclick="closeRisk('${r.id}')">Riski Kapat</button>`;
-            const actionCell = `${progressButton ? progressButton + '<br>' : ''}${closeButton}<br><button class="delete-risk-btn" onclick="deleteRisk('${r.id}')">Sil</button>`;
-            const photoCell = r.image_url
-                ? `<a href="${r.image_url}" target="_blank" style="color:var(--primary); font-weight:bold; text-decoration:none;">📷 Var</a>`
-                : '<span style="color:var(--text-muted);">Yok</span>';
-            const hazardText = isClosed ? `<s>${r.hazard_title || ''}</s>` : (r.hazard_title || '');
-            const actionText = r.action_plan ? `<div class="action-note"><strong>Önlem:</strong> ${r.action_plan}</div>` : '<div class="action-note">Önlem girilmemiş</div>';
-            const statusText = r.status || 'Açık';
-            const statusColor = statusText === 'Kapalı' ? 'var(--accent-green)' : (statusText === 'Devam Ediyor' ? '#f97316' : '#b91c1c');
-            const closeNote = r.close_note ? `<div class="action-note"><strong>Kapanış:</strong> ${r.close_note}</div>` : '';
+    if (!CURRENT_AUTH || !CURRENT_AUTH.tenant_id) {
+        riskTableRows = [];
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:#b91c1c;">Tenant bilgisi bulunamadı.</td></tr>`;
+        return;
+    }
 
-            tbody.innerHTML += `<tr class="${isClosed ? 'status-closed' : ''}"><td><strong>${compName}</strong></td><td>${hazardText}${actionText}${closeNote}</td><td>${r.responsible_person || '<span style="color:var(--text-muted);">-</span>'}</td><td>${photoCell}</td><td>${r.risk_score}</td><td><span class="badge" style="background:${badgeColor}; color:${textColor};">${lvlText}</span><br><span style="font-weight:bold; color:${statusColor}; font-size:11px;">${statusText}</span></td><td>${r.target_date}</td><td>${actionCell}</td></tr>`;
+    const { data, error } = await dbClient
+        .from('risk_assessments')
+        .select('*, customer_companies!inner(company_name, tenant_id)')
+        .eq('tenant_id', CURRENT_AUTH.tenant_id)
+        .eq('customer_companies.tenant_id', CURRENT_AUTH.tenant_id)
+        .order('status', { ascending: false })
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        riskTableRows = [];
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:red;">Hata: ${error.message}</td></tr>`;
+        return;
+    }
+
+    if (!data || data.length === 0) {
+        riskTableRows = [];
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">Kayıtlı risk bulgusu yok.</td></tr>`;
+        return;
+    }
+
+    riskTableRows = data.map(r => {
+        const companyName = r.customer_companies ? r.customer_companies.company_name : 'Bilinmeyen Firma';
+        const hazard = r.hazard_title || '';
+        const actionPlan = r.action_plan || '';
+        const closeNote = r.close_note || '';
+        const statusText = r.status || 'Açık';
+        const hasPhoto = !!r.image_url;
+
+        return {
+            id: r.id,
+            company_name: companyName,
+            hazard_title: hazard,
+            action_plan: actionPlan,
+            hazard_text: `${hazard} ${actionPlan} ${closeNote}`,
+            responsible_person: r.responsible_person || '',
+            image_url: r.image_url || '',
+            has_photo: hasPhoto ? 1 : 0,
+            photo_text: hasPhoto ? 'var' : 'yok',
+            risk_score: Number(r.risk_score) || 0,
+            status: statusText,
+            status_text: statusText,
+            target_date: r.target_date || '',
+            close_note: closeNote
+        };
+    });
+
+    renderRiskTable();
+}
+function escapeHtml(value) {
+    return (value || '').toString().replace(/[&<>'"]/g, function (char) {
+        return {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            "'": '&#39;',
+            '"': '&quot;'
+        }[char];
+    });
+}
+
+function getRiskLevelInfo(score) {
+    let badgeColor = '#dcfce7';
+    let textColor = '#15803d';
+    let lvlText = 'Düşük';
+
+    if (score >= 20 && score < 70) {
+        badgeColor = '#ffedd5';
+        textColor = '#c2410c';
+        lvlText = 'Olası';
+    } else if (score >= 70 && score < 200) {
+        badgeColor = '#fee2e2';
+        textColor = '#b91c1c';
+        lvlText = 'Önemli';
+    } else if (score >= 200) {
+        badgeColor = '#f87171';
+        textColor = '#ffffff';
+        lvlText = 'ESASLI';
+    }
+
+    return { badgeColor, textColor, lvlText };
+}
+
+function getRiskFilteredRows() {
+    const filters = {};
+
+    document.querySelectorAll('.risk-filter-input').forEach(input => {
+        const field = input.dataset.field;
+        const value = (input.value || '').toString().trim().toLowerCase();
+
+        if (field && value) {
+            filters[field] = value;
+        }
+    });
+
+    let rows = [...riskTableRows];
+
+    Object.keys(filters).forEach(field => {
+        const value = filters[field];
+
+        rows = rows.filter(row => {
+            const cellValue = row[field] !== undefined && row[field] !== null
+                ? row[field].toString().toLowerCase()
+                : '';
+
+            return cellValue.includes(value);
+        });
+    });
+
+    if (riskSortField) {
+        rows.sort((a, b) => {
+            const av = a[riskSortField];
+            const bv = b[riskSortField];
+
+            if (typeof av === 'number' && typeof bv === 'number') {
+                return riskSortDirection === 'asc' ? av - bv : bv - av;
+            }
+
+            return riskSortDirection === 'asc'
+                ? (av || '').toString().localeCompare((bv || '').toString(), 'tr')
+                : (bv || '').toString().localeCompare((av || '').toString(), 'tr');
         });
     }
 
-    window.fetchRisks = fetchRisks;
+    return rows;
+}
 
-    async function setRiskInProgress(id) {
-        const { error } = await dbClient.from('risk_assessments').update({ status: 'Devam Ediyor' }).eq('id', id);
-        if (error) { alert('Durum güncellenemedi: ' + error.message); return; }
-        fetchRisks();
+function renderRiskTable() {
+    const tbody = document.getElementById('risk_table_body');
+    const rows = getRiskFilteredRows();
+
+    updateRiskSortIndicators();
+
+    if (!rows || rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">Filtreye uygun risk bulgusu bulunamadı.</td></tr>`;
+        return;
     }
 
+    tbody.innerHTML = '';
+
+    rows.forEach(r => {
+        const level = getRiskLevelInfo(r.risk_score);
+        const isClosed = r.status === 'Kapalı';
+        const isInProgress = r.status === 'Devam Ediyor';
+
+        const progressButton = (!isClosed && !isInProgress)
+            ? `<button class="close-btn" style="background:#f97316;" onclick="setRiskInProgress('${r.id}')">Devam Ediyor</button>`
+            : '';
+
+        const closeButton = isClosed
+            ? '<span style="color:var(--accent-green); font-weight:bold; display:block; margin-bottom:6px;">✓ Giderildi</span>'
+            : `<button class="close-btn" onclick="closeRisk('${r.id}')">Riski Kapat</button>`;
+
+        const actionCell = `${progressButton ? progressButton + '<br>' : ''}${closeButton}<br><button class="delete-risk-btn" onclick="deleteRisk('${r.id}')">Sil</button>`;
+
+        const photoCell = r.image_url
+            ? `<a href="${escapeHtml(r.image_url)}" target="_blank" style="color:var(--primary); font-weight:bold; text-decoration:none;">📷 Var</a>`
+            : '<span style="color:var(--text-muted);">Yok</span>';
+
+        const hazardText = isClosed
+            ? `<s>${escapeHtml(r.hazard_title)}</s>`
+            : escapeHtml(r.hazard_title);
+
+        const actionText = r.action_plan
+            ? `<div class="action-note"><strong>Önlem:</strong> ${escapeHtml(r.action_plan)}</div>`
+            : '<div class="action-note">Önlem girilmemiş</div>';
+
+        const closeNote = r.close_note
+            ? `<div class="action-note"><strong>Kapanış:</strong> ${escapeHtml(r.close_note)}</div>`
+            : '';
+
+        const statusColor = r.status === 'Kapalı'
+            ? 'var(--accent-green)'
+            : (r.status === 'Devam Ediyor' ? '#f97316' : '#b91c1c');
+
+        tbody.innerHTML += `
+            <tr class="${isClosed ? 'status-closed' : ''}">
+                <td><strong>${escapeHtml(r.company_name)}</strong></td>
+                <td>${hazardText}${actionText}${closeNote}</td>
+                <td>${r.responsible_person ? escapeHtml(r.responsible_person) : '<span style="color:var(--text-muted);">-</span>'}</td>
+                <td>${photoCell}</td>
+                <td>${r.risk_score}</td>
+                <td>
+                    <span class="badge" style="background:${level.badgeColor}; color:${level.textColor};">${level.lvlText}</span><br>
+                    <span style="font-weight:bold; color:${statusColor}; font-size:11px;">${escapeHtml(r.status)}</span>
+                </td>
+                <td>${escapeHtml(r.target_date || '-')}</td>
+                <td>${actionCell}</td>
+            </tr>
+        `;
+    });
+}
+
+function applyRiskFilters() {
+    renderRiskTable();
+}
+
+function sortRisksBy(field) {
+    if (riskSortField === field) {
+        riskSortDirection = riskSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        riskSortField = field;
+        riskSortDirection = 'asc';
+    }
+
+    renderRiskTable();
+}
+
+function updateRiskSortIndicators() {
+    const fields = [
+        'company_name',
+        'hazard_title',
+        'responsible_person',
+        'has_photo',
+        'risk_score',
+        'status',
+        'target_date'
+    ];
+
+    fields.forEach(field => {
+        const el = document.getElementById(`sort_${field}`);
+
+        if (!el) return;
+
+        if (field === riskSortField) {
+            el.innerText = riskSortDirection === 'asc' ? '▲' : '▼';
+        } else {
+            el.innerText = '';
+        }
+    });
+}
+    window.fetchRisks = fetchRisks;
+
+   async function setRiskInProgress(id) {
+    if (!CURRENT_AUTH || !CURRENT_AUTH.tenant_id) {
+        alert('Tenant bilgisi bulunamadı.');
+        return;
+    }
+
+    const { error } = await dbClient
+        .from('risk_assessments')
+        .update({ status: 'Devam Ediyor' })
+        .eq('id', id)
+        .eq('tenant_id', CURRENT_AUTH.tenant_id);
+
+    if (error) {
+        alert('Durum güncellenemedi: ' + error.message);
+        return;
+    }
+
+    fetchRisks();
+}
+
     async function closeRisk(id) {
-        const note = prompt('Bu risk/DÖF nasıl giderildi? Kapanış açıklamasını yazın:');
-        if (note === null) return;
-        if (!note.trim()) { alert('Kapanış açıklaması boş bırakılamaz.'); return; }
-        const { error } = await dbClient.from('risk_assessments').update({
+    if (!CURRENT_AUTH || !CURRENT_AUTH.tenant_id) {
+        alert('Tenant bilgisi bulunamadı.');
+        return;
+    }
+
+    const note = prompt('Bu risk/DÖF nasıl giderildi? Kapanış açıklamasını yazın:');
+    if (note === null) return;
+    if (!note.trim()) {
+        alert('Kapanış açıklaması boş bırakılamaz.');
+        return;
+    }
+
+    const { error } = await dbClient
+        .from('risk_assessments')
+        .update({
             status: 'Kapalı',
             close_note: note.trim(),
             closed_at: new Date().toISOString()
-        }).eq('id', id);
-        if (error) { alert('Kapatma hatası: ' + error.message); return; }
-        fetchRisks();
+        })
+        .eq('id', id)
+        .eq('tenant_id', CURRENT_AUTH.tenant_id);
+
+    if (error) {
+        alert('Kapatma hatası: ' + error.message);
+        return;
     }
+
+    fetchRisks();
+}
 
     function extractStoragePathFromPublicUrl(publicUrl) {
         if (!publicUrl) return null;
@@ -1344,11 +1660,17 @@
     async function deleteRisk(id) {
         if(!confirm("Bu risk kaydı ve varsa bağlı fotoğrafı kalıcı olarak silinsin mi?")) return;
 
-        const { data: risk, error: readError } = await dbClient
-            .from('risk_assessments')
-            .select('id, image_url, image_path')
-            .eq('id', id)
-            .single();
+        if (!CURRENT_AUTH || !CURRENT_AUTH.tenant_id) {
+    alert('Tenant bilgisi bulunamadı.');
+    return;
+}
+
+const { data: risk, error: readError } = await dbClient
+    .from('risk_assessments')
+    .select('id, image_url, image_path')
+    .eq('id', id)
+    .eq('tenant_id', CURRENT_AUTH.tenant_id)
+    .single();
 
         if (readError) {
             alert("Silme öncesi kayıt okunamadı: " + readError.message);
@@ -1368,7 +1690,11 @@
             }
         }
 
-        const { error } = await dbClient.from('risk_assessments').delete().eq('id', id);
+        const { error } = await dbClient
+    .from('risk_assessments')
+    .delete()
+    .eq('id', id)
+    .eq('tenant_id', CURRENT_AUTH.tenant_id);
         if (error) { alert("Silme hatası: " + error.message); return; }
         fetchRisks();
     }
@@ -1531,10 +1857,23 @@
 
         if(!compId || !hazard || !target) { alert("Lütfen firma, tehlike tanımı ve termin tarihini doldurun!"); return; }
 
-        const localRisk = {
-            local_id: makeLocalId(),
-            company_id: compId,
-            hazard_title: hazard,
+        if (!CURRENT_AUTH || !CURRENT_AUTH.tenant_id) {
+    alert('Tenant bilgisi bulunamadı.');
+    return;
+}
+
+const companyAllowed = lastLoadedCompanies.some(c => String(c.id) === String(compId) && String(c.tenant_id) === String(CURRENT_AUTH.tenant_id));
+
+if (!companyAllowed) {
+    alert('Seçilen firma bu tenant altında bulunamadı.');
+    return;
+}
+
+const localRisk = {
+    local_id: makeLocalId(),
+    tenant_id: CURRENT_AUTH.tenant_id,
+    company_id: compId,
+    hazard_title: hazard,
             action_plan: actionPlan || null,
             responsible_person: responsible || null,
             probability_o: o,
