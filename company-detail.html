@@ -789,18 +789,6 @@
     window.onload = async function() {
         const { data: { session } } = await dbClient.auth.getSession();
         if (!session) { window.location.href = "login.html"; return; }
-        const email = (session.user.email || '').toLowerCase();
-        const { data: staff, error: staffError } = await dbClient
-            .from('osgb_staff')
-            .select('*, tenants(id, name, slug, logo_url, primary_color, is_active)')
-            .ilike('email', email)
-            .maybeSingle();
-        if (staffError || !staff || staff.can_login === false) {
-            await dbClient.auth.signOut();
-            window.location.href = "login.html";
-            return;
-        }
-        window.CURRENT_AUTH = { session, email, role: staff.access_role || 'uzman', staff, tenant_id: staff.tenant_id, tenant: staff.tenants };
         document.body.style.display = "block";
 
         const urlParams = new URLSearchParams(window.location.search);
@@ -815,7 +803,7 @@
     };
 
     async function fetchCompanyProfile(id) {
-        const { data } = await dbClient.from('customer_companies').select('*').eq('tenant_id', window.CURRENT_AUTH.tenant_id).eq('id', id).single();
+        const { data } = await dbClient.from('customer_companies').select('*').eq('id', id).single();
         if (data) {
             currentCompanyName = data.company_name;
             document.getElementById('lbl_company_name').innerText = data.company_name;
@@ -827,7 +815,7 @@
 
     async function fetchCompanyRisks(id) {
         const tbody = document.getElementById('company_risk_tbody');
-        const { data, error } = await dbClient.from('risk_assessments').select('*').eq('tenant_id', window.CURRENT_AUTH.tenant_id).eq('company_id', id).order('created_at', { ascending: false });
+        const { data, error } = await dbClient.from('risk_assessments').select('*').eq('company_id', id).order('created_at', { ascending: false });
         if (error) { tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#b91c1c;">Hata: ${escapeHtml(error.message)}</td></tr>`; return; }
         if (!data || data.length === 0) {
             tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#94a3b8;">Kayıtlı DÖF / risk bulgusu yok.</td></tr>`;
@@ -876,7 +864,7 @@
 
     async function fetchCompanySchedules(id) {
         const tbody = document.getElementById('company_schedule_tbody');
-        const { data, error } = await dbClient.from('field_schedules').select('*').eq('tenant_id', window.CURRENT_AUTH.tenant_id).eq('company_id', id).order('visit_date', { ascending: false });
+        const { data, error } = await dbClient.from('field_schedules').select('*').eq('company_id', id).order('visit_date', { ascending: false });
         if (error) { tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#b91c1c;">Hata: ${escapeHtml(error.message)}</td></tr>`; return; }
         if (!data || data.length === 0) { tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#94a3b8;">Ziyaret kaydı bulunmuyor.</td></tr>`; return; }
         tbody.innerHTML = '';
@@ -887,7 +875,7 @@
 
     async function fetchCompanyMedical(id) {
         const tbody = document.getElementById('company_medical_tbody');
-        const { data, error } = await dbClient.from('worker_medical_records').select('*').eq('tenant_id', window.CURRENT_AUTH.tenant_id).eq('company_id', id).order('created_at', { ascending: false });
+        const { data, error } = await dbClient.from('worker_medical_records').select('*').eq('company_id', id).order('created_at', { ascending: false });
         if (error) { tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#b91c1c;">Hata: ${escapeHtml(error.message)}</td></tr>`; return; }
         if (!data || data.length === 0) { tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#94a3b8;">Sağlık muayene kaydı yok.</td></tr>`; return; }
         tbody.innerHTML = '';

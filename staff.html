@@ -872,7 +872,6 @@
         const userInfo = document.getElementById('current_user_email');
         if (userInfo) userInfo.innerText = `${auth.email} • ${roleLabel(auth.role)}`;
         setTenantBranding(auth.tenant);
-        window.CURRENT_AUTH = auth;
         applyRoleBasedNavigation(auth.role);
         if (page && !canAccessPage(auth.role, page)) {
             window.location.href = 'dashboard.html';
@@ -950,7 +949,7 @@
 
     async function fetchStaff() {
         const tbody = document.getElementById('staff_table_body');
-        let query = dbClient.from('osgb_staff').select('*, tenants(name, slug)').eq('tenant_id', window.CURRENT_AUTH.tenant_id).order('created_at', { ascending: false });
+        let query = dbClient.from('osgb_staff').select('*, tenants(name, slug)').order('created_at', { ascending: false });
         if (CURRENT_AUTH && CURRENT_AUTH.role !== 'super_admin' && CURRENT_AUTH.tenant_id) query = query.eq('tenant_id', CURRENT_AUTH.tenant_id);
         const { data, error } = await query;
         tbody.innerHTML = '';
@@ -996,7 +995,7 @@
             can_login: document.getElementById('modal_can_login').value === 'true',
             is_active_manual: document.getElementById('modal_is_active_manual').value
         };
-        const { error } = await dbClient.from('osgb_staff').update(payload).eq('tenant_id', window.CURRENT_AUTH.tenant_id).eq('id', id);
+        const { error } = await dbClient.from('osgb_staff').update(payload).eq('id', id);
         if (error) { alert('Güncelleme hatası: ' + error.message); return; }
         closeModal(); fetchStaff();
     }
@@ -1022,7 +1021,7 @@
         document.getElementById('staff_name').value = ''; document.getElementById('staff_email').value = ''; fetchStaff(); 
     }
 
-    async function deleteStaff(id) { if(confirm("Silinsin mi?")) { await dbClient.from('osgb_staff').delete().eq('tenant_id', window.CURRENT_AUTH.tenant_id).eq('id', id); fetchStaff(); } }
+    async function deleteStaff(id) { if(confirm("Silinsin mi?")) { await dbClient.from('osgb_staff').delete().eq('id', id); fetchStaff(); } }
     async function handleLogout() { await dbClient.auth.signOut(); window.location.href = "login.html"; }
 </script>
 </body>

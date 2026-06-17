@@ -965,7 +965,6 @@
         const userInfo = document.getElementById('current_user_email');
         if (userInfo) userInfo.innerText = `${auth.email} • ${roleLabel(auth.role)}`;
         setTenantBranding(auth.tenant);
-        window.CURRENT_AUTH = auth;
         applyRoleBasedNavigation(auth.role);
         if (page && !canAccessPage(auth.role, page)) {
             window.location.href = 'dashboard.html';
@@ -1245,7 +1244,6 @@
             const { data, error } = await dbClient
                 .from('customer_companies')
                 .select('id, company_name, nace_code, danger_class')
-                .eq('tenant_id', window.CURRENT_AUTH.tenant_id)
                 .order('company_name');
 
             if (error) throw error;
@@ -1281,7 +1279,7 @@
 
     async function fetchRisks() {
         const tbody = document.getElementById('risk_table_body');
-        const { data } = await dbClient.from('risk_assessments').select('*, customer_companies(company_name)').eq('tenant_id', window.CURRENT_AUTH.tenant_id).order('status', { ascending: false }).order('created_at', { ascending: false });
+        const { data } = await dbClient.from('risk_assessments').select('*, customer_companies(company_name)').order('status', { ascending: false }).order('created_at', { ascending: false });
         tbody.innerHTML = '';
         if (!data || data.length === 0) { tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">Kayıtlı risk bulgusu yok.</td></tr>`; return; }
         
@@ -1313,7 +1311,7 @@
     window.fetchRisks = fetchRisks;
 
     async function setRiskInProgress(id) {
-        const { error } = await dbClient.from('risk_assessments').update({ status: 'Devam Ediyor' }).eq('tenant_id', window.CURRENT_AUTH.tenant_id).eq('id', id);
+        const { error } = await dbClient.from('risk_assessments').update({ status: 'Devam Ediyor' }).eq('id', id);
         if (error) { alert('Durum güncellenemedi: ' + error.message); return; }
         fetchRisks();
     }
@@ -1326,7 +1324,7 @@
             status: 'Kapalı',
             close_note: note.trim(),
             closed_at: new Date().toISOString()
-        }).eq('tenant_id', window.CURRENT_AUTH.tenant_id).eq('id', id);
+        }).eq('id', id);
         if (error) { alert('Kapatma hatası: ' + error.message); return; }
         fetchRisks();
     }
@@ -1370,7 +1368,7 @@
             }
         }
 
-        const { error } = await dbClient.from('risk_assessments').delete().eq('tenant_id', window.CURRENT_AUTH.tenant_id).eq('id', id);
+        const { error } = await dbClient.from('risk_assessments').delete().eq('id', id);
         if (error) { alert("Silme hatası: " + error.message); return; }
         fetchRisks();
     }
@@ -1535,8 +1533,7 @@
 
         const localRisk = {
             local_id: makeLocalId(),
-            tenant_id: window.CURRENT_AUTH ? window.CURRENT_AUTH.tenant_id : null,
-                company_id: compId,
+            company_id: compId,
             hazard_title: hazard,
             action_plan: actionPlan || null,
             responsible_person: responsible || null,

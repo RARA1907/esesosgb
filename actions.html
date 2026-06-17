@@ -879,7 +879,6 @@
         const { data, error } = await dbClient
             .from('risk_assessments')
             .select('*, customer_companies(company_name)')
-            .eq('tenant_id', window.CURRENT_AUTH.tenant_id)
             .order('target_date', { ascending: true })
             .order('created_at', { ascending: false });
 
@@ -968,7 +967,7 @@
     }
 
     async function markInProgress(id) {
-        const { error } = await dbClient.from('risk_assessments').update({ status: 'Devam Ediyor' }).eq('tenant_id', window.CURRENT_AUTH.tenant_id).eq('id', id);
+        const { error } = await dbClient.from('risk_assessments').update({ status: 'Devam Ediyor' }).eq('id', id);
         if (error) { alert('Durum güncellenemedi: ' + error.message); return; }
         await fetchDofs();
     }
@@ -983,7 +982,7 @@
             status: 'Kapalı',
             close_note: cleanNote,
             closed_at: new Date().toISOString()
-        }).eq('tenant_id', window.CURRENT_AUTH.tenant_id).eq('id', id);
+        }).eq('id', id);
 
         if (error) { alert('DÖF kapatılamadı: ' + error.message); return; }
         await fetchDofs();
@@ -1001,7 +1000,6 @@
         const { data, error } = await dbClient
             .from('field_schedules')
             .select('*, customer_companies(company_name)')
-            .eq('tenant_id', window.CURRENT_AUTH.tenant_id)
             .gte('visit_date', start)
             .lt('visit_date', end)
             .order('visit_date', { ascending: true });
