@@ -447,11 +447,15 @@
         return { url: data && data.publicUrl ? data.publicUrl : null, path };
     }
 
+    function severityRiskValues(severity) {
+        if (severity === 'Kritik') return { probability_o: 5, frequency_f: 1, severity_s: 5, risk_score: 25 };
+        if (severity === 'Yüksek') return { probability_o: 3, frequency_f: 2, severity_s: 3, risk_score: 18 };
+        if (severity === 'Orta') return { probability_o: 2, frequency_f: 2, severity_s: 3, risk_score: 12 };
+        return { probability_o: 1, frequency_f: 1, severity_s: 6, risk_score: 6 };
+    }
+
     function severityScore(severity) {
-        if (severity === 'Kritik') return 25;
-        if (severity === 'Yüksek') return 18;
-        if (severity === 'Orta') return 12;
-        return 6;
+        return severityRiskValues(severity).risk_score;
     }
 
     async function saveAccident() {
@@ -595,15 +599,19 @@
         const hazard = `İş kazası: ${a.accident_type || ''} - ${a.worker_name || ''}`.trim();
         const action = a.corrective_action || a.immediate_action || a.root_cause_summary || 'İş kazası kök neden analizi sonucunda düzeltici/önleyici faaliyet planlanmalıdır.';
         const targetDate = a.corrective_target_date || a.sgk_deadline || todayString();
+        const riskValues = severityRiskValues(a.severity);
         const { error } = await dbClient.from('risk_assessments').insert([{
             tenant_id: CURRENT_AUTH.tenant_id,
             company_id: a.company_id,
             hazard_title: hazard,
             action_plan: action,
             responsible_person: a.responsible_person || 'İSG Uzmanı',
+            probability_o: riskValues.probability_o,
+            frequency_f: riskValues.frequency_f,
+            severity_s: riskValues.severity_s,
+            risk_score: riskValues.risk_score,
             target_date: targetDate,
             status: 'Açık',
-            risk_score: severityScore(a.severity),
             image_url: a.file_url || null,
             image_path: a.file_path || null
         }]);
