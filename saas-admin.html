@@ -674,6 +674,9 @@
         .saas-create-panel .link-box { min-height: 43px; display: flex; align-items: center; }
         @media(max-width: 900px){ .saas-create-grid, .saas-link-row { grid-template-columns: 1fr; } .saas-create-actions { justify-content: stretch; } .saas-create-actions .btn { width: 100%; } }
 
+
+        .admin-lock-disabled { opacity: .62; cursor: not-allowed; }
+        #edit_super_admin_lock_note.hidden { display:none !important; }
     </style>
 </head>
 <body>
@@ -843,10 +846,34 @@ const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentAuth = null;
 
 function normalizeAccessRole(value){ const v=(value||'').toString().trim().toLowerCase(); if(['super_admin','super admin','saas_admin','sistem sahibi'].includes(v)) return 'super_admin'; if(['admin','yonetici','yönetici'].includes(v)) return 'admin'; if(['uzman','isg_uzmani','isg uzmanı','iş güvenliği uzmanı'].includes(v)) return 'uzman'; if(['hekim','isyeri hekimi','işyeri hekimi'].includes(v)) return 'hekim'; if(['dsp','diğer sağlık personeli','diger saglik personeli'].includes(v)) return 'dsp'; if(['firma_yetkilisi','firma yetkilisi','musteri','müşteri'].includes(v)) return 'firma_yetkilisi'; return ''; }
+function inferAccessRoleFromEmail(email){ const e=(email||'').toLowerCase(); if(e.includes('orhan.vardar@gmail.com')) return 'super_admin'; if(e.includes('admin')) return 'admin'; return ''; }
 function roleLabel(role){ return {super_admin:'Super Admin',admin:'Admin',uzman:'İSG Uzmanı',hekim:'İşyeri Hekimi',dsp:'DSP',firma_yetkilisi:'Firma Yetkilisi'}[role] || role || 'Rol yok'; }
 function isStaffAccessActive(record){ if(!record) return true; if(record.can_login===false) return false; if(record.is_active_manual==='Aktif') return true; if(record.is_active_manual==='Pasif') return false; return true; }
-async function getCurrentAuthContext(){ const {data:{session}}=await dbClient.auth.getSession(); if(!session) return {session:null}; const email=session.user.email||''; const {data}=await dbClient.from('osgb_staff').select('*, tenants(id, name, slug, logo_url, primary_color, is_active)').ilike('email', email).maybeSingle(); const staff=data||null; const role=normalizeAccessRole(staff&&staff.access_role); return {session,email,role,staff,canLogin:isStaffAccessActive(staff),tenant:staff&&staff.tenants?staff.tenants:null}; }
-async function requireSuperAdmin(){ const auth=await getCurrentAuthContext(); if(!auth.session){ window.location.href='login.html'; return null; } if(!auth.canLogin){ await dbClient.auth.signOut(); alert('Bu kullanıcı için sistem erişimi pasif.'); window.location.href='login.html'; return null; } if(auth.role!=='super_admin'){ alert('Bu sayfa yalnızca Super Admin içindir.'); window.location.href='dashboard.html'; return null; } document.getElementById('current_user_email').innerText = `${auth.email} • ${roleLabel(auth.role)}`; setTenantBranding(auth.tenant); currentAuth = auth; return auth; }
+async function getCurrentAuthContext(){
+  const {data:{session}}=await dbClient.auth.getSession();
+  if(!session) return {session:null};
+  const email=session.user.email||'';
+  let staff=null;
+  try{
+    const {data,error}=await dbClient.from('osgb_staff').select('*, tenants(id, name, slug, logo_url, primary_color, is_active)').ilike('email', email).maybeSingle();
+    if(error) throw error;
+    staff=data||null;
+  }catch(err){
+    console.warn('SaaS Yönetimi rol kaydı okunamadı:', err.message);
+  }
+  const role=normalizeAccessRole(staff&&staff.access_role) || normalizeAccessRole(staff&&staff.staff_role) || inferAccessRoleFromEmail(email);
+  return {session,email,role,staff,canLogin:isStaffAccessActive(staff),tenant:staff&&staff.tenants?staff.tenants:null,tenant_id:staff?staff.tenant_id:null};
+}
+async function requireSuperAdmin(){
+  const auth=await getCurrentAuthContext();
+  if(!auth.session){ window.location.href='login.html'; return null; }
+  if(!auth.canLogin){ await dbClient.auth.signOut(); alert('Bu kullanıcı için sistem erişimi pasif.'); window.location.href='login.html'; return null; }
+  if(auth.role!=='super_admin'){ alert('Bu sayfa yalnızca Super Admin içindir.'); window.location.href='dashboard.html'; return null; }
+  document.getElementById('current_user_email').innerText = `${auth.email} • ${roleLabel(auth.role)}`;
+  setTenantBranding(auth.tenant);
+  currentAuth = auth;
+  return auth;
+}
 function slugify(txt){ return (txt||'').toString().trim().toLowerCase().replace(/ğ/g,'g').replace(/ü/g,'u').replace(/ş/g,'s').replace(/ı/g,'i').replace(/ö/g,'o').replace(/ç/g,'c').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
 function tenantLoginUrl(slug){ return `${window.location.origin}/login.html?tenant=${encodeURIComponent(slug||'')}`; }
 function previewLoginLink(){ const slug=slugify(document.getElementById('tenant_slug').value); document.getElementById('login_link_preview').innerText = slug ? tenantLoginUrl(slug) : 'Slug girince link oluşur.'; }
@@ -941,6 +968,7 @@ function clearEditedLogo(){
 function clearForm(){ ['tenant_name','tenant_slug','tenant_logo','admin_name','admin_email'].forEach(id=>document.getElementById(id).value=''); const f=document.getElementById('tenant_logo_file'); if(f) f.value=''; resetLogoPreview('tenant_logo_preview'); document.getElementById('tenant_color').value='#2563eb'; document.getElementById('tenant_slug').dataset.touched=''; previewLoginLink(); setStatus(''); }
 async function createTenantWithAdmin(){
   try{
+    if(!currentAuth || currentAuth.role !== 'super_admin') throw new Error('Bu işlem yalnızca Super Admin tarafından yapılabilir.');
     const name=document.getElementById('tenant_name').value.trim();
     const slug=slugify(document.getElementById('tenant_slug').value);
     let logo=document.getElementById('tenant_logo').value.trim() || null;
@@ -949,13 +977,25 @@ async function createTenantWithAdmin(){
     const adminEmail=document.getElementById('admin_email').value.trim().toLowerCase();
     if(!name || !slug) throw new Error('Müşteri adı ve slug zorunlu.');
     if(!adminName || !adminEmail) throw new Error('İlk admin adı ve e-postası zorunlu.');
+
+    const {data:existingSlug,error:slugErr}=await dbClient.from('tenants').select('id').eq('slug', slug).maybeSingle();
+    if(slugErr) throw slugErr;
+    if(existingSlug) throw new Error('Bu slug/kısa kod zaten kullanılıyor. Lütfen farklı bir slug girin.');
+
+    const {data:existingStaff,error:staffCheckErr}=await dbClient.from('osgb_staff').select('id, tenant_id').ilike('email', adminEmail).maybeSingle();
+    if(staffCheckErr) throw staffCheckErr;
+    if(existingStaff) throw new Error('Bu admin e-postası zaten bir personel kaydında kullanılıyor.');
+
     const {data:tenant, error:tErr}=await dbClient.from('tenants').insert({name, slug, logo_url:null, primary_color:color, is_active:true}).select().single();
     if(tErr) throw tErr;
+
     logo = await uploadLogoForTenant(tenant.id, slug, 'tenant_logo_file');
     if(logo){ const {error:logoErr}=await dbClient.from('tenants').update({logo_url:logo}).eq('id', tenant.id); if(logoErr) throw logoErr; }
+
     const {error:sErr}=await dbClient.from('osgb_staff').insert({tenant_id:tenant.id, name_surname:adminName, staff_role:'Yönetici', certificate_class:'Yok', email:adminEmail, hire_date:new Date().toISOString().slice(0,10), is_active_manual:'Aktif', access_role:'admin', can_login:true, auth_invite_status:'not_sent'});
     if(sErr) throw sErr;
-    setStatus(`Müşteri oluşturuldu. Giriş linki: ${tenantLoginUrl(slug)}`, true);
+
+    setStatus(`Müşteri oluşturuldu. Giriş linki: ${tenantLoginUrl(slug)}. Davet için listedeki “Davet Gönder” butonunu kullan.`, true);
     clearForm(); await loadTenants();
   }catch(err){ setStatus('Hata: '+(err.message||err), false); }
 }
@@ -989,31 +1029,61 @@ async function loadTenants(){
 function inviteBadge(status){ const s=(status||'not_sent').toString(); if(s==='sent') return '<span class="badge badge-green">Davet gönderildi</span>'; if(s==='failed') return '<span class="badge badge-red">Davet hatası</span>'; return '<span class="badge badge-gray">Davet yok</span>'; }
 function escapeHtml(v){ return (v||'').toString().replace(/[&<>'"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
 async function copyText(text){ await navigator.clipboard.writeText(text); alert('Giriş linki kopyalandı.'); }
-async function toggleTenant(id, isActive){ const {error}=await dbClient.from('tenants').update({is_active:!isActive}).eq('id', id); if(error){ alert(error.message); return; } loadTenants(); }
+async function toggleTenant(id, isActive){
+  if(!currentAuth || currentAuth.role !== 'super_admin'){ alert('Bu işlem yalnızca Super Admin içindir.'); return; }
+  const nextState=!isActive;
+  const msg=nextState ? 'Bu müşteriyi tekrar aktif hale getirmek istiyor musun?' : 'Bu müşteriyi pasifleştirmek istiyor musun? Pasif tenant kullanıcıları girişte engellenmelidir.';
+  if(!confirm(msg)) return;
+  const {error}=await dbClient.from('tenants').update({is_active:nextState}).eq('id', id);
+  if(error){ alert(error.message); return; }
+  await loadTenants();
+}
+
+function setAdminEditLocked(isLocked){
+  ['edit_admin_name','edit_admin_email','edit_admin_role','edit_admin_can_login'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.disabled=!!isLocked;
+    el.classList.toggle('admin-lock-disabled', !!isLocked);
+  });
+  const note=document.getElementById('edit_super_admin_lock_note');
+  if(note) note.classList.toggle('hidden', !isLocked);
+}
 async function editTenant(id){
   setEditStatus('');
   const {data:t,error}=await dbClient.from('tenants').select('*').eq('id',id).single();
   if(error){ alert(error.message); return; }
-  const {data:admins}=await dbClient.from('osgb_staff').select('id,name_surname,email,access_role,can_login,is_active_manual,auth_invite_status').eq('tenant_id', id).in('access_role',['admin','super_admin']);
+  const {data:admins,error:aLoadErr}=await dbClient.from('osgb_staff').select('id,name_surname,email,access_role,can_login,is_active_manual,auth_invite_status').eq('tenant_id', id).in('access_role',['admin','super_admin']).order('access_role',{ascending:true});
+  if(aLoadErr){ alert(aLoadErr.message); return; }
   const admin=(admins||[]).find(a=>normalizeAccessRole(a.access_role)==='admin') || (admins||[])[0] || null;
+  const originalRole = admin ? (normalizeAccessRole(admin.access_role)||'admin') : '';
+  const isLockedSuperAdmin = originalRole === 'super_admin';
+
   document.getElementById('edit_tenant_id').value=t.id;
   document.getElementById('edit_admin_id').value=admin ? admin.id : '';
   document.getElementById('edit_tenant_name').value=t.name||'';
   document.getElementById('edit_tenant_slug').value=t.slug||'';
-  document.getElementById('edit_tenant_logo').value=t.logo_url||''; document.getElementById('edit_tenant_logo_file').value=''; if(t.logo_url){ const img=document.getElementById('edit_tenant_logo_preview'); img.src=t.logo_url; img.style.opacity='1'; } else { resetLogoPreview('edit_tenant_logo_preview'); }
+  document.getElementById('edit_tenant_logo').value=t.logo_url||'';
+  document.getElementById('edit_tenant_logo_file').value='';
+  if(t.logo_url){ const img=document.getElementById('edit_tenant_logo_preview'); img.src=t.logo_url; img.style.opacity='1'; } else { resetLogoPreview('edit_tenant_logo_preview'); }
   document.getElementById('edit_tenant_color').value=t.primary_color||'#2563eb';
   document.getElementById('edit_tenant_active').value=(t.is_active!==false).toString();
+
   document.getElementById('edit_admin_name').value=admin ? (admin.name_surname||'') : '';
   document.getElementById('edit_admin_email').value=admin ? (admin.email||'') : '';
-  document.getElementById('edit_admin_role').value=admin ? (normalizeAccessRole(admin.access_role)||'admin') : 'admin';
+  document.getElementById('edit_admin_role').value=admin ? (originalRole||'admin') : 'admin';
+  document.getElementById('edit_admin_role').dataset.originalRole = originalRole;
   document.getElementById('edit_admin_can_login').value=(!admin || admin.can_login!==false).toString();
+  setAdminEditLocked(isLockedSuperAdmin);
+
   document.getElementById('edit_panel').classList.remove('hidden');
   previewEditLoginLink();
   window.scrollTo({top:0, behavior:'smooth'});
 }
-function cancelEdit(){ document.getElementById('edit_panel').classList.add('hidden'); setEditStatus(''); }
+function cancelEdit(){ document.getElementById('edit_panel').classList.add('hidden'); setAdminEditLocked(false); setEditStatus(''); }
 async function saveEditedTenant(){
   try{
+    if(!currentAuth || currentAuth.role !== 'super_admin') throw new Error('Bu işlem yalnızca Super Admin tarafından yapılabilir.');
     const tenantId=document.getElementById('edit_tenant_id').value;
     const adminId=document.getElementById('edit_admin_id').value;
     const name=document.getElementById('edit_tenant_name').value.trim();
@@ -1024,28 +1094,60 @@ async function saveEditedTenant(){
     const adminName=document.getElementById('edit_admin_name').value.trim();
     const adminEmail=document.getElementById('edit_admin_email').value.trim().toLowerCase();
     const originalAdminRole = document.getElementById('edit_admin_role').dataset.originalRole || '';
+    const isLockedSuperAdmin = originalAdminRole === 'super_admin';
     const adminRole=document.getElementById('edit_admin_role').value;
     const adminCanLogin=document.getElementById('edit_admin_can_login').value==='true';
     if(!tenantId || !name || !slug) throw new Error('Müşteri adı ve slug zorunlu.');
-    if(!adminName || !adminEmail) throw new Error('Admin adı ve e-postası zorunlu.');
+    if(!isLockedSuperAdmin && (!adminName || !adminEmail)) throw new Error('Admin adı ve e-postası zorunlu.');
+
+    const {data:slugOwner,error:slugErr}=await dbClient.from('tenants').select('id').eq('slug', slug).neq('id', tenantId).maybeSingle();
+    if(slugErr) throw slugErr;
+    if(slugOwner) throw new Error('Bu slug/kısa kod başka bir tenant tarafından kullanılıyor.');
+
     const uploadedLogo = await uploadLogoForTenant(tenantId, slug, 'edit_tenant_logo_file');
     if(uploadedLogo) logo = uploadedLogo;
     const {error:tErr}=await dbClient.from('tenants').update({name, slug, logo_url:logo, primary_color:color, is_active:isActive}).eq('id', tenantId);
     if(tErr) throw tErr;
+
+    if(isLockedSuperAdmin){
+      setEditStatus('Müşteri bilgileri güncellendi. Super Admin kullanıcı bilgileri korunarak değiştirilmedi.', true);
+      await loadTenants();
+      return;
+    }
+
     if(adminId){
-      const {error:aErr}=await dbClient.from('osgb_staff').update({name_surname:adminName, email:adminEmail, access_role:adminRole, can_login:adminCanLogin, is_active_manual:adminCanLogin?'Aktif':'Pasif'}).eq('id', adminId);
+      const {data:emailOwner,error:eErr}=await dbClient.from('osgb_staff').select('id').ilike('email', adminEmail).neq('id', adminId).maybeSingle();
+      if(eErr) throw eErr;
+      if(emailOwner) throw new Error('Bu admin e-postası başka bir personel kaydında kullanılıyor.');
+      const {error:aErr}=await dbClient.from('osgb_staff').update({name_surname:adminName, email:adminEmail, access_role:adminRole, can_login:adminCanLogin, is_active_manual:adminCanLogin?'Aktif':'Pasif'}).eq('id', adminId).eq('tenant_id', tenantId);
       if(aErr) throw aErr;
     } else {
+      const {data:emailOwner,error:eErr}=await dbClient.from('osgb_staff').select('id').ilike('email', adminEmail).maybeSingle();
+      if(eErr) throw eErr;
+      if(emailOwner) throw new Error('Bu admin e-postası başka bir personel kaydında kullanılıyor.');
       const {data:newAdmin,error:iErr}=await dbClient.from('osgb_staff').insert({tenant_id:tenantId, name_surname:adminName, staff_role:'Yönetici', certificate_class:'Yok', email:adminEmail, hire_date:new Date().toISOString().slice(0,10), is_active_manual:adminCanLogin?'Aktif':'Pasif', access_role:adminRole, can_login:adminCanLogin, auth_invite_status:'not_sent'}).select('id').single();
       if(iErr) throw iErr;
       document.getElementById('edit_admin_id').value=newAdmin.id;
+      document.getElementById('edit_admin_role').dataset.originalRole = adminRole;
     }
-    if(originalAdminRole === 'super_admin') setEditStatus('Müşteri bilgileri güncellendi. Super Admin kullanıcı bilgileri korunarak değiştirilmedi.', true); else setEditStatus('Kayıt güncellendi.', true);
+    setEditStatus('Kayıt güncellendi.', true);
     await loadTenants();
   }catch(err){ setEditStatus('Hata: '+(err.message||err), false); }
 }
-async function resetInviteForEditingAdmin(){ const id=document.getElementById('edit_admin_id').value; if(!id){ setEditStatus('Önce admin kaydını kaydetmelisin.', false); return; } await resetInvite(id); }
-async function sendInviteForEditingAdmin(){ const id=document.getElementById('edit_admin_id').value; if(!id){ setEditStatus('Önce admin kaydını kaydetmelisin.', false); return; } await sendInvite(id); }
+async function resetInviteForEditingAdmin(){
+  const id=document.getElementById('edit_admin_id').value;
+  const originalRole=document.getElementById('edit_admin_role').dataset.originalRole || '';
+  if(originalRole==='super_admin'){ setEditStatus('Super Admin davet durumu bu panelden değiştirilmez.', false); return; }
+  if(!id){ setEditStatus('Önce admin kaydını kaydetmelisin.', false); return; }
+  await resetInvite(id);
+}
+async function sendInviteForEditingAdmin(){
+  const id=document.getElementById('edit_admin_id').value;
+  const originalRole=document.getElementById('edit_admin_role').dataset.originalRole || '';
+  if(originalRole==='super_admin'){ setEditStatus('Super Admin için bu panelden davet gönderilmez.', false); return; }
+  if(!id){ setEditStatus('Önce admin kaydını kaydetmelisin.', false); return; }
+  await sendInvite(id);
+}
 async function resetInvite(staffId){
   const {error}=await dbClient.from('osgb_staff').update({auth_invite_status:'not_sent', auth_invited_at:null}).eq('id', staffId);
   if(error){ setEditStatus('Davet durumu sıfırlanamadı: '+error.message, false); return; }
@@ -1066,12 +1168,13 @@ async function sendInvite(staffId){
     });
     const result=await resp.json().catch(()=>({}));
     if(!resp.ok || result.ok===false) throw new Error(result.error || JSON.stringify(result));
+    await dbClient.from('osgb_staff').update({auth_invite_status:'sent', auth_invited_at:new Date().toISOString()}).eq('id', staffId);
     setEditStatus('Davet gönderildi: '+(result.email||staff.email), true);
     await loadTenants();
   }catch(err){ setEditStatus('Davet gönderilemedi: '+(err.message||err), false); alert('Davet gönderilemedi: '+(err.message||err)); }
 }
 async function handleLogout(){ await dbClient.auth.signOut(); window.location.href='login.html'; }
-window.onload=async()=>{ const auth=await requireSuperAdmin(); if(!auth) return; document.body.style.display='block'; resetLogoPreview('tenant_logo_preview'); resetLogoPreview('edit_tenant_logo_preview'); previewLoginLink(); loadTenants(); };
+window.onload=async()=>{ const auth=await requireSuperAdmin(); if(!auth) return; document.body.style.display='block'; resetLogoPreview('tenant_logo_preview'); resetLogoPreview('edit_tenant_logo_preview'); previewLoginLink(); await loadTenants(); };
 </script>
 </body>
 </html>
