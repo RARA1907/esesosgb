@@ -779,6 +779,90 @@
 
     let allDofs = [];
     let currentFilter = 'active';
+    let CURRENT_AUTH = null;
+
+    function normalizeAccessRole(value) {
+        const v = (value || '').toString().trim().toLowerCase();
+        if (['super_admin', 'super admin', 'saas_admin', 'sistem sahibi'].includes(v)) return 'super_admin';
+        if (['admin', 'yonetici', 'yönetici'].includes(v)) return 'admin';
+        if (['uzman', 'isg_uzmani', 'isg uzmanı', 'iş güvenliği uzmanı'].includes(v)) return 'uzman';
+        if (['hekim', 'isyeri hekimi', 'işyeri hekimi'].includes(v)) return 'hekim';
+        if (['dsp', 'diğer sağlık personeli', 'diger saglik personeli'].includes(v)) return 'dsp';
+        if (['firma_yetkilisi', 'firma yetkilisi', 'musteri', 'müşteri'].includes(v)) return 'firma_yetkilisi';
+        return '';
+    }
+
+    function inferAccessRoleFromEmail(email) {
+        const e = (email || '').toLowerCase();
+        if (e.includes('orhan.vardar@gmail.com')) return 'super_admin';
+        if (e.includes('admin')) return 'admin';
+        if (e.includes('hekim')) return 'hekim';
+        if (e.includes('dsp')) return 'dsp';
+        if (e.includes('firma') || e.includes('musteri') || e.includes('müşteri')) return 'firma_yetkilisi';
+        if (e.includes('uzman')) return 'uzman';
+        return 'uzman';
+    }
+
+    function roleLabel(role) {
+        return { super_admin: 'Super Admin', admin: 'Admin', uzman: 'İSG Uzmanı', hekim: 'İşyeri Hekimi', dsp: 'DSP', firma_yetkilisi: 'Firma Yetkilisi' }[role] || role || 'Rol yok';
+    }
+
+    function isStaffAccessActive(record) {
+        if (!record) return true;
+        if (record.can_login === false) return false;
+        if (record.is_active_manual === 'Aktif') return true;
+        if (record.is_active_manual === 'Pasif') return false;
+        const today = new Date(); today.setHours(0,0,0,0);
+        if (record.hire_date) {
+            const hire = new Date(record.hire_date); hire.setHours(0,0,0,0);
+            if (hire > today) return false;
+        }
+        if (record.termination_date) {
+            const term = new Date(record.termination_date); term.setHours(0,0,0,0);
+            if (term <= today) return false;
+        }
+        return true;
+    }
+
+    async function getCurrentAuthContext() {
+        const { data: { session } } = await dbClient.auth.getSession();
+        if (!session) return { session: null, email: '', role: '', canLogin: false, staff: null, tenant_id: null, tenant: null };
+        const email = session.user.email || '';
+        let staff = null;
+        try {
+            const { data } = await dbClient
+                .from('osgb_staff')
+                .select('*, tenants(id, name, slug, logo_url, primary_color, is_active)')
+                .ilike('email', email)
+                .maybeSingle();
+            staff = data || null;
+        } catch (err) {
+            console.warn('Rol/tenant kaydı okunamadı:', err.message);
+        }
+        const role = normalizeAccessRole(staff && staff.access_role) || normalizeAccessRole(staff && staff.staff_role) || inferAccessRoleFromEmail(email);
+        const canLogin = isStaffAccessActive(staff);
+        return { session, email, role, canLogin, staff, tenant: staff && staff.tenants ? staff.tenants : null, tenant_id: staff ? staff.tenant_id : null };
+    }
+
+    function setTenantBranding(tenant) {
+        const titleEl = document.getElementById('lbl_osgb_title');
+        if (titleEl) titleEl.innerText = (tenant && tenant.name) ? tenant.name : 'Eses Software';
+        const area = titleEl ? titleEl.closest('.logo-area') : null;
+        if (!area) return;
+        let img = area.querySelector('.tenant-logo-img');
+        const logoUrl = tenant && tenant.logo_url ? tenant.logo_url : '';
+        if (logoUrl) {
+            if (!img) {
+                img = document.createElement('img');
+                img.className = 'tenant-logo-img';
+                img.alt = 'Logo';
+                area.insertBefore(img, titleEl);
+            }
+            img.src = logoUrl;
+        } else if (img) {
+            img.remove();
+        }
+    }
 
     function normalizeFilterParam(rawFilter) {
         const value = (rawFilter || '').trim().toLowerCase();
@@ -813,10 +897,25 @@
     }
 
     window.onload = async function() {
-        const { data: { session } } = await dbClient.auth.getSession();
-        if (!session) { window.location.href = "login.html"; return; }
+        const auth = await getCurrentAuthContext();
+        if (!auth.session) { window.location.href = "login.html"; return; }
+        if (!auth.canLogin) {
+            await dbClient.auth.signOut();
+            alert('Bu kullanıcı için sistem erişimi pasif. Lütfen OSGB yöneticisiyle iletişime geçin.');
+            window.location.href = 'login.html';
+            return;
+        }
+        if (!auth.tenant_id) {
+            alert('Bu kullanıcı herhangi bir tenant ile ilişkilendirilmemiş. Lütfen personel kaydını kontrol edin.');
+            await dbClient.auth.signOut();
+            window.location.href = 'login.html';
+            return;
+        }
+        CURRENT_AUTH = auth;
+        window.CURRENT_AUTH = CURRENT_AUTH;
         document.body.style.display = "block";
-        document.getElementById('current_user_email').innerText = session.user.email;
+        document.getElementById('current_user_email').innerText = `${auth.email} • ${roleLabel(auth.role)}`;
+        setTenantBranding(auth.tenant);
         applyInitialFilterFromUrl();
         await refreshAll();
     };
@@ -876,13 +975,24 @@
         const tbody = document.getElementById('dof_tbody');
         tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:#94a3b8;">DÖF kayıtları yükleniyor...</td></tr>`;
 
+        if (!CURRENT_AUTH || !CURRENT_AUTH.tenant_id) {
+            allDofs = [];
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:#b91c1c; font-weight:bold;">Tenant bilgisi bulunamadı.</td></tr>`;
+            updateStats();
+            return;
+        }
+
         const { data, error } = await dbClient
             .from('risk_assessments')
-            .select('*, customer_companies(company_name)')
+            .select('*, customer_companies!inner(company_name, tenant_id)')
+            .eq('tenant_id', CURRENT_AUTH.tenant_id)
+            .eq('customer_companies.tenant_id', CURRENT_AUTH.tenant_id)
             .order('target_date', { ascending: true })
             .order('created_at', { ascending: false });
 
         if (error) {
+            allDofs = [];
+            updateStats();
             tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:#b91c1c; font-weight:bold;">Hata: ${escapeHTML(error.message)}</td></tr>`;
             return;
         }
@@ -967,7 +1077,12 @@
     }
 
     async function markInProgress(id) {
-        const { error } = await dbClient.from('risk_assessments').update({ status: 'Devam Ediyor' }).eq('id', id);
+        if (!CURRENT_AUTH || !CURRENT_AUTH.tenant_id) { alert('Tenant bilgisi bulunamadı.'); return; }
+        const { error } = await dbClient
+            .from('risk_assessments')
+            .update({ status: 'Devam Ediyor' })
+            .eq('id', id)
+            .eq('tenant_id', CURRENT_AUTH.tenant_id);
         if (error) { alert('Durum güncellenemedi: ' + error.message); return; }
         await fetchDofs();
     }
@@ -978,11 +1093,17 @@
         const cleanNote = note.trim();
         if (!cleanNote) { alert('Kapanış açıklaması boş olamaz.'); return; }
 
-        const { error } = await dbClient.from('risk_assessments').update({
-            status: 'Kapalı',
-            close_note: cleanNote,
-            closed_at: new Date().toISOString()
-        }).eq('id', id);
+        if (!CURRENT_AUTH || !CURRENT_AUTH.tenant_id) { alert('Tenant bilgisi bulunamadı.'); return; }
+
+        const { error } = await dbClient
+            .from('risk_assessments')
+            .update({
+                status: 'Kapalı',
+                close_note: cleanNote,
+                closed_at: new Date().toISOString()
+            })
+            .eq('id', id)
+            .eq('tenant_id', CURRENT_AUTH.tenant_id);
 
         if (error) { alert('DÖF kapatılamadı: ' + error.message); return; }
         await fetchDofs();
@@ -997,9 +1118,17 @@
         const endDate = new Date(year, month + 1, 1);
         const end = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-01`;
 
+        if (!CURRENT_AUTH || !CURRENT_AUTH.tenant_id) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#b91c1c;">Tenant bilgisi bulunamadı.</td></tr>`;
+            document.getElementById('cnt_visits').innerText = '0';
+            return;
+        }
+
         const { data, error } = await dbClient
             .from('field_schedules')
-            .select('*, customer_companies(company_name)')
+            .select('*, customer_companies!inner(company_name, tenant_id)')
+            .eq('tenant_id', CURRENT_AUTH.tenant_id)
+            .eq('customer_companies.tenant_id', CURRENT_AUTH.tenant_id)
             .gte('visit_date', start)
             .lt('visit_date', end)
             .order('visit_date', { ascending: true });
