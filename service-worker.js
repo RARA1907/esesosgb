@@ -1,4 +1,4 @@
-const CACHE_NAME = 'osgb-saas-cache-v24';
+const CACHE_NAME = 'osgb-saas-cache-v25';
 const APP_SHELL = [
   './',
   './risk.html',
