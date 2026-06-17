@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OSGB SaaS - Hekim Sağlık Kartı</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
     <style>
         :root {
             --bg-main: #f4f6f9;
@@ -666,6 +668,20 @@
             opacity: 0.75;
         }
 
+
+        .pdf-download-btn {
+            background: linear-gradient(135deg, #16a34a, #047857);
+            color: white;
+            border: none;
+            padding: 7px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 800;
+            font-size: 11px;
+            white-space: nowrap;
+        }
+        .pdf-download-btn:hover { background: linear-gradient(135deg, #15803d, #065f46); }
+
     </style>
 </head>
 <body>
@@ -736,15 +752,17 @@
                     <th class="sortable-th" onclick="sortMedicalBy('worker_name')">Çalışan Adı (Yaş/Cinsiyet) <span id="sort_worker_name" class="sort-indicator"></span></th>
                     <th class="sortable-th" onclick="sortMedicalBy('clinical_text')">Klinik Bulgular (Göz/Kalp) <span id="sort_clinical_text" class="sort-indicator"></span></th>
                     <th class="sortable-th" onclick="sortMedicalBy('final_decision')">Hekim Kararı <span id="sort_final_decision" class="sort-indicator"></span></th>
+                    <th>Yasal Ek-2 Formu</th>
                 </tr>
                 <tr class="medical-filter-row">
                     <th><input class="medical-filter-input" data-field="company_name" oninput="applyMedicalFilters()" placeholder="Firma filtrele"></th>
                     <th><input class="medical-filter-input" data-field="worker_text" oninput="applyMedicalFilters()" placeholder="Ad / yaş / cinsiyet"></th>
                     <th><input class="medical-filter-input" data-field="clinical_text" oninput="applyMedicalFilters()" placeholder="Göz / kalp / kas"></th>
                     <th><input class="medical-filter-input" data-field="final_decision" oninput="applyMedicalFilters()" placeholder="Karar filtrele"></th>
+                    <th></th>
                 </tr>
             </thead>
-            <tbody id="medical_table_body"><tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Veriler yükleniyor...</td></tr></tbody>
+            <tbody id="medical_table_body"><tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Veriler yükleniyor...</td></tr></tbody>
         </table>
     </div>
 </div>
@@ -952,7 +970,7 @@
 
         if (!CURRENT_AUTH || !CURRENT_AUTH.tenant_id) {
             medicalTableRows = [];
-            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#b91c1c;">Tenant bilgisi bulunamadı.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#b91c1c;">Tenant bilgisi bulunamadı.</td></tr>`;
             return;
         }
 
@@ -965,13 +983,13 @@
 
         if (error) {
             medicalTableRows = [];
-            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:red;">Hata: ${error.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red;">Hata: ${error.message}</td></tr>`;
             return;
         }
 
         if (!data || data.length === 0) {
             medicalTableRows = [];
-            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Kayıtlı muayene kartı bulunmuyor.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Kayıtlı muayene kartı bulunmuyor.</td></tr>`;
             return;
         }
 
@@ -996,7 +1014,8 @@
                 kalp_secure: kalp,
                 kas_secure: kas,
                 clinical_text: `${goz} ${kalp} ${kas}`,
-                final_decision: decision
+                final_decision: decision,
+                created_at: m.created_at || null
             };
         });
 
@@ -1061,7 +1080,7 @@
         updateMedicalSortIndicators();
 
         if (!rows || rows.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Filtreye uygun muayene kartı bulunamadı.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Filtreye uygun muayene kartı bulunamadı.</td></tr>`;
             return;
         }
 
@@ -1074,6 +1093,7 @@
                     <td>${escapeHtml(m.worker_name)} (${escapeHtml(m.worker_age || '-')} / ${escapeHtml(m.worker_gender || '-')})</td>
                     <td>👁️ ${escapeHtml(m.goz_secure || '-')} <br> ❤️ ${escapeHtml(m.kalp_secure || '-')}</td>
                     <td><span class="badge-decision">${escapeHtml(m.final_decision || '-')}</span></td>
+                    <td><button class="pdf-download-btn" onclick="downloadLegalEk2Pdf('${escapeHtml(m.id)}')">📄 Yasal Ek-2 Formu İndir (PDF)</button></td>
                 </tr>
             `;
         });
@@ -1104,6 +1124,143 @@
                 ? (medicalSortDirection === 'asc' ? '▲' : '▼')
                 : '';
         });
+    }
+
+
+    function pdfSafe(value) {
+        return value === null || value === undefined || value === '' ? '-' : String(value);
+    }
+
+    function pdfDate(value) {
+        const date = value ? new Date(value) : new Date();
+        if (Number.isNaN(date.getTime())) return value || '-';
+        return date.toLocaleDateString('tr-TR');
+    }
+
+    function fileSafeName(value) {
+        return (value || 'calisan')
+            .toString()
+            .trim()
+            .replace(/[^a-zA-Z0-9ğüşöçıİĞÜŞÖÇ\s_-]/g, '')
+            .replace(/\s+/g, '_')
+            .substring(0, 60) || 'calisan';
+    }
+
+    function downloadLegalEk2Pdf(recordId) {
+        const record = medicalTableRows.find(row => String(row.id) === String(recordId));
+        if (!record) {
+            alert('PDF oluşturulacak sağlık kartı bulunamadı. Sayfayı yenileyip tekrar deneyin.');
+            return;
+        }
+
+        if (!window.jspdf || !window.jspdf.jsPDF) {
+            alert('PDF motoru yüklenemedi. İnternet bağlantısını kontrol edip sayfayı yenileyin.');
+            return;
+        }
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const margin = 14;
+        let y = 14;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text('T.C. ÇALIŞMA VE SOSYAL GÜVENLİK BAKANLIĞI', pageWidth / 2, y, { align: 'center' });
+        y += 6;
+        doc.setFontSize(10);
+        doc.text('İş Sağlığı ve Güvenliği Genel Müdürlüğü', pageWidth / 2, y, { align: 'center' });
+        y += 8;
+        doc.setFontSize(13);
+        doc.text('EK-2 İŞÇİ SAĞLIK MUAYENE KARTI', pageWidth / 2, y, { align: 'center' });
+        y += 7;
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text('İşe Giriş / Periyodik Muayene Formu', pageWidth / 2, y, { align: 'center' });
+        y += 7;
+        doc.line(margin, y, pageWidth - margin, y);
+        y += 7;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.text('1. İŞYERİ VE ÇALIŞAN BİLGİLERİ', margin, y);
+        y += 3;
+
+        doc.autoTable({
+            startY: y,
+            theme: 'grid',
+            head: [['Alan', 'Bilgi']],
+            body: [
+                ['İşyeri / Firma Unvanı', pdfSafe(record.company_name)],
+                ['Çalışanın Adı Soyadı', pdfSafe(record.worker_name)],
+                ['Yaş / Cinsiyet', `${pdfSafe(record.worker_age)} / ${pdfSafe(record.worker_gender)}`],
+                ['Muayene Tarihi', pdfDate(record.created_at)],
+                ['Form Üretim Tarihi', new Date().toLocaleDateString('tr-TR')]
+            ],
+            styles: { font: 'helvetica', fontSize: 9, cellPadding: 2.5 },
+            headStyles: { fillColor: [37, 99, 235], textColor: 255 },
+            columnStyles: { 0: { cellWidth: 55, fontStyle: 'bold' }, 1: { cellWidth: 125 } },
+            margin: { left: margin, right: margin }
+        });
+
+        y = doc.lastAutoTable.finalY + 8;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.text('2. KLİNİK MUAYENE BULGULARI', margin, y);
+        y += 3;
+
+        doc.autoTable({
+            startY: y,
+            theme: 'grid',
+            head: [['Muayene Alanı', 'Bulgular']],
+            body: [
+                ['Göz Muayene Bulguları', pdfSafe(record.goz_secure)],
+                ['Kardiyovasküler Bulgular', pdfSafe(record.kalp_secure)],
+                ['Kas-İskelet Sistemi Bulguları', pdfSafe(record.kas_secure)]
+            ],
+            styles: { font: 'helvetica', fontSize: 9, cellPadding: 2.5 },
+            headStyles: { fillColor: [22, 163, 74], textColor: 255 },
+            columnStyles: { 0: { cellWidth: 55, fontStyle: 'bold' }, 1: { cellWidth: 125 } },
+            margin: { left: margin, right: margin }
+        });
+
+        y = doc.lastAutoTable.finalY + 8;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.text('3. HEKİM NİHAİ KANAATİ VE SONUÇ KARARI', margin, y);
+        y += 3;
+
+        doc.autoTable({
+            startY: y,
+            theme: 'grid',
+            body: [[pdfSafe(record.final_decision)]],
+            styles: { font: 'helvetica', fontSize: 11, fontStyle: 'bold', cellPadding: 4, halign: 'center' },
+            bodyStyles: { fillColor: [239, 246, 255], textColor: [30, 64, 175] },
+            margin: { left: margin, right: margin }
+        });
+
+        y = doc.lastAutoTable.finalY + 10;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        const noteLines = doc.splitTextToSize('Bu belge, sistemde kayıtlı periyodik muayene kartı verilerinden otomatik olarak oluşturulmuştur. Hekim tarafından kontrol edilip imzalanarak fiziksel/kurumsal kayıt sürecinde kullanılmalıdır.', pageWidth - margin * 2);
+        doc.text(noteLines, margin, y);
+        y += noteLines.length * 5 + 8;
+
+        doc.autoTable({
+            startY: y,
+            theme: 'grid',
+            body: [
+                ['İşyeri Hekimi Adı Soyadı', ''],
+                ['Kaşe / İmza', ''],
+                ['Tarih', new Date().toLocaleDateString('tr-TR')]
+            ],
+            styles: { font: 'helvetica', fontSize: 9, cellPadding: 5 },
+            columnStyles: { 0: { cellWidth: 55, fontStyle: 'bold' }, 1: { cellWidth: 125, minCellHeight: 14 } },
+            margin: { left: margin, right: margin }
+        });
+
+        const filename = `EK-2_${fileSafeName(record.worker_name)}_${fileSafeName(record.company_name)}.pdf`;
+        doc.save(filename);
     }
 
     async function saveMedical() {
