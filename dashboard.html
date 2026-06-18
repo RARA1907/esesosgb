@@ -763,6 +763,16 @@
             .near-miss-alert-grid { grid-template-columns: 1fr !important; }
         }
 
+
+        .training-alert-grid { grid-template-columns: repeat(5, minmax(170px, 1fr)) !important; }
+        .training-panel { margin-top: 4px !important; margin-bottom: 18px !important; }
+        @media (max-width: 1100px) {
+            .training-alert-grid { grid-template-columns: repeat(2, minmax(190px, 1fr)) !important; }
+        }
+        @media (max-width: 900px) {
+            .training-alert-grid { grid-template-columns: 1fr !important; }
+        }
+
     </style>
 </head>
 <body>
@@ -796,6 +806,7 @@
             <a id="menu_medical" href="medical.html" class="nav-btn" style="display:none;">🩺 Hekim Sağlık Kartı</a>
             <a id="menu_accidents" href="accidents.html" class="nav-btn" style="display:none;">🚑 İş Kazaları</a>
             <a id="menu_near_miss" href="near-miss-admin.html" class="nav-btn" style="display:none;">⚠️ Ramak Kala</a>
+            <a id="menu_training" href="training.html" class="nav-btn" style="display:none;">🎓 Eğitim & Sertifika</a>
         </div>
     </div>
 
@@ -890,6 +901,51 @@
                 </tr>
             </thead>
             <tbody id="near_miss_alerts_tbody"><tr><td colspan="4" class="empty-state">Ramak kala bildirimleri yükleniyor...</td></tr></tbody>
+        </table>
+    </div>
+
+    <div class="section-title">🎓 Eğitim ve Sertifika Uyarıları</div>
+    <div class="kpi-grid training-alert-grid">
+        <div class="metric-box metric-red clickable" onclick="window.location.href='training.html'">
+            <div class="metric-title">Geçerliliği Dolan Eğitim</div>
+            <div class="metric-value" id="stat_training_expired">0</div>
+            <div class="metric-sub">Yenileme gerekli</div>
+        </div>
+        <div class="metric-box metric-amber clickable" onclick="window.location.href='training.html'">
+            <div class="metric-title">Yenileme Yaklaşıyor</div>
+            <div class="metric-value" id="stat_training_upcoming">0</div>
+            <div class="metric-sub">Önümüzdeki 30 gün</div>
+        </div>
+        <div class="metric-box metric-orange clickable" onclick="window.location.href='training.html'">
+            <div class="metric-title">Eksik / Devam Eden</div>
+            <div class="metric-value" id="stat_training_incomplete">0</div>
+            <div class="metric-sub">Süre tamamlanmadı</div>
+        </div>
+        <div class="metric-box metric-slate clickable" onclick="window.location.href='training.html'">
+            <div class="metric-title">Hiç Katılmadığı Zorunlu</div>
+            <div class="metric-value" id="stat_training_never">0</div>
+            <div class="metric-sub">Kayıt bulunmayan zorunlu eğitim</div>
+        </div>
+        <div class="metric-box metric-purple clickable" onclick="window.location.href='training.html'">
+            <div class="metric-title">Parça Parça Katılan</div>
+            <div class="metric-value" id="stat_training_split">0</div>
+            <div class="metric-sub">Birden fazla oturum</div>
+        </div>
+    </div>
+
+    <div class="panel training-panel">
+        <h3>🎓 Kritik Eğitim Uyarıları</h3>
+        <p>Eksik eğitimler, hiç katılmayanlar, geçerliliği dolan sertifikalar ve yenilemesi yaklaşan kayıtlar.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Uyarı</th>
+                    <th>Firma / Çalışan</th>
+                    <th>Eğitim</th>
+                    <th>Durum</th>
+                </tr>
+            </thead>
+            <tbody id="training_alerts_tbody"><tr><td colspan="4" class="empty-state">Eğitim uyarıları yükleniyor...</td></tr></tbody>
         </table>
     </div>
 
@@ -999,7 +1055,7 @@
 
     function canAccessPage(role, page) {
         if (role === 'super_admin' || role === 'admin') return true;
-        if (page === 'risk' || page === 'accidents' || page === 'near_miss') return role === 'uzman';
+        if (page === 'risk' || page === 'accidents' || page === 'near_miss' || page === 'training') return role === 'uzman';
         if (page === 'medical') return role === 'hekim';
         if (page === 'staff') return false;
         if (page === 'company' || page === 'workers' || page === 'schedule') return ['uzman','hekim','dsp'].includes(role);
@@ -1017,12 +1073,14 @@
         const saasMenu = document.getElementById('menu_saas');
         const accidentsMenu = document.getElementById('menu_accidents');
         const nearMissMenu = document.getElementById('menu_near_miss');
+        const trainingMenu = document.getElementById('menu_training');
         if (riskMenu && canAccessPage(role, 'risk')) riskMenu.style.display = 'inline-block';
         if (medicalMenu && canAccessPage(role, 'medical')) medicalMenu.style.display = 'inline-block';
         if (staffMenu && canAccessPage(role, 'staff')) staffMenu.style.display = 'inline-block';
         if (staffMenu && !canAccessPage(role, 'staff')) staffMenu.style.display = 'none';
         if (accidentsMenu && canAccessPage(role, 'accidents')) accidentsMenu.style.display = 'inline-block';
         if (nearMissMenu && canAccessPage(role, 'near_miss')) nearMissMenu.style.display = 'inline-block';
+        if (trainingMenu && canAccessPage(role, 'training')) trainingMenu.style.display = 'inline-block';
         if (saasMenu) saasMenu.style.display = role === 'super_admin' ? 'inline-block' : 'none';
     }
 
@@ -1240,6 +1298,137 @@
         });
     }
 
+
+
+    const DEFAULT_REQUIRED_TRAININGS = [
+        'Temel İş Sağlığı ve Güvenliği Eğitimi',
+        'Yangın Eğitimi',
+        'Acil Durum Eğitimi',
+        'KKD Kullanım Eğitimi',
+        'İlk Yardım Bilgilendirme'
+    ];
+
+    function trainingCompletionStatus(row) {
+        const required = Number(row && row.required_hours || 0);
+        const completed = Number(row && row.completed_hours || 0);
+        if (required > 0 && completed >= required) return 'Tamamlandı';
+        if (completed <= 0) return 'Hiç Katılmadı';
+        return 'Eksik';
+    }
+
+    function trainingRenewalState(row, today) {
+        if (!row || trainingCompletionStatus(row) !== 'Tamamlandı') return 'Yok';
+        if (!row.renewal_date) return 'Yok';
+        const soon = addDaysString(today, 30);
+        if (row.renewal_date < today) return 'Geçerliliği Doldu';
+        if (row.renewal_date <= soon) return 'Yenileme Yaklaşıyor';
+        return 'Geçerli';
+    }
+
+    function trainingAlertBadge(type) {
+        if (type === 'Geçerliliği Doldu') return '<span class="badge badge-red">Geçerliliği Doldu</span>';
+        if (type === 'Yenileme Yaklaşıyor') return '<span class="badge badge-orange">Yenileme Yaklaşıyor</span>';
+        if (type === 'Eksik') return '<span class="badge badge-orange">Eksik</span>';
+        if (type === 'Hiç Katılmadı') return '<span class="badge badge-red">Hiç Katılmadı</span>';
+        if (type === 'Parça Parça') return '<span class="badge badge-blue">Parça Parça</span>';
+        return '<span class="badge badge-green">Takipte</span>';
+    }
+
+    function renderTrainingAlerts(alerts) {
+        const tbody = document.getElementById('training_alerts_tbody');
+        if (!tbody) return;
+        const list = (alerts || []).slice(0, 9);
+        if (list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Kritik eğitim uyarısı yok.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = '';
+        list.forEach(a => {
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${escapeHtml(a.type)}</strong></td>
+                    <td>${escapeHtml(a.companyName || '-')}<br><small style="color:var(--text-muted);">${escapeHtml(a.workerName || '-')}</small></td>
+                    <td>${escapeHtml(a.trainingType || '-')}<br><small style="color:var(--text-muted);">${escapeHtml(a.detail || '')}</small></td>
+                    <td>${trainingAlertBadge(a.type)}<br><a class="small-link" href="training.html">Aç</a></td>
+                </tr>`;
+        });
+    }
+
+    function buildTrainingDashboard(completions, sessions, workers, companies, today) {
+        const completionsList = completions || [];
+        const sessionsList = sessions || [];
+        const workerList = workers || [];
+        const companyList = companies || [];
+        const alerts = [];
+        const completionKeySet = new Set(completionsList.map(r => `${r.worker_id}||${r.training_type}`));
+        const workerById = new Map(workerList.map(w => [String(w.id), w]));
+
+        const expired = completionsList.filter(r => trainingRenewalState(r, today) === 'Geçerliliği Doldu');
+        const upcoming = completionsList.filter(r => trainingRenewalState(r, today) === 'Yenileme Yaklaşıyor');
+        const incomplete = completionsList.filter(r => trainingCompletionStatus(r) === 'Eksik');
+        const split = completionsList.filter(r => sessionsList.filter(s => String(s.completion_id) === String(r.id) && Number(s.attended_hours || 0) > 0).length > 1);
+
+        let neverCount = 0;
+        workerList.forEach(w => {
+            DEFAULT_REQUIRED_TRAININGS.forEach(trainingType => {
+                if (!completionKeySet.has(`${w.id}||${trainingType}`)) {
+                    neverCount += 1;
+                    if (alerts.length < 30) {
+                        alerts.push({
+                            priority: 4,
+                            type: 'Hiç Katılmadı',
+                            companyName: getCompanyNameById(companyList, w.company_id),
+                            workerName: w.full_name || '-',
+                            trainingType,
+                            detail: 'Zorunlu eğitim dosyası bulunmuyor'
+                        });
+                    }
+                }
+            });
+        });
+
+        expired.forEach(r => alerts.push({
+            priority: 1,
+            type: 'Geçerliliği Doldu',
+            companyName: r.customer_companies ? r.customer_companies.company_name : getCompanyNameById(companyList, r.company_id),
+            workerName: r.worker_name || (workerById.get(String(r.worker_id)) || {}).full_name || '-',
+            trainingType: r.training_type,
+            detail: `Yenileme tarihi: ${r.renewal_date || '-'}`
+        }));
+        upcoming.forEach(r => alerts.push({
+            priority: 2,
+            type: 'Yenileme Yaklaşıyor',
+            companyName: r.customer_companies ? r.customer_companies.company_name : getCompanyNameById(companyList, r.company_id),
+            workerName: r.worker_name || (workerById.get(String(r.worker_id)) || {}).full_name || '-',
+            trainingType: r.training_type,
+            detail: `Yenileme tarihi: ${r.renewal_date || '-'}`
+        }));
+        incomplete.forEach(r => alerts.push({
+            priority: 3,
+            type: 'Eksik',
+            companyName: r.customer_companies ? r.customer_companies.company_name : getCompanyNameById(companyList, r.company_id),
+            workerName: r.worker_name || (workerById.get(String(r.worker_id)) || {}).full_name || '-',
+            trainingType: r.training_type,
+            detail: `${Number(r.completed_hours || 0)} / ${Number(r.required_hours || 0)} saat tamamlandı`
+        }));
+        split.forEach(r => alerts.push({
+            priority: 5,
+            type: 'Parça Parça',
+            companyName: r.customer_companies ? r.customer_companies.company_name : getCompanyNameById(companyList, r.company_id),
+            workerName: r.worker_name || (workerById.get(String(r.worker_id)) || {}).full_name || '-',
+            trainingType: r.training_type,
+            detail: 'Birden fazla oturumla tamamlanıyor/tamamlandı'
+        }));
+
+        alerts.sort((a,b) => a.priority - b.priority || String(a.companyName).localeCompare(String(b.companyName), 'tr') || String(a.workerName).localeCompare(String(b.workerName), 'tr'));
+
+        setDashValue('stat_training_expired', expired.length);
+        setDashValue('stat_training_upcoming', upcoming.length);
+        setDashValue('stat_training_incomplete', incomplete.length);
+        setDashValue('stat_training_never', neverCount);
+        setDashValue('stat_training_split', split.length);
+        renderTrainingAlerts(alerts);
+    }
     async function fetchDashboardStats(authContext) {
         try {
             const auth = authContext || CURRENT_AUTH || window.__CURRENT_AUTH_CONTEXT__;
@@ -1249,7 +1438,7 @@
             const today = todayString();
             const { start, end } = currentMonthRange();
 
-            const [companiesRes, workersRes, risksRes, visitsRes, medicalTestsRes, healthFollowupsRes, nearMissRes] = await Promise.all([
+            const [companiesRes, workersRes, risksRes, visitsRes, medicalTestsRes, healthFollowupsRes, nearMissRes, trainingCompletionsRes, trainingSessionsRes] = await Promise.all([
                 dbClient
                     .from('customer_companies')
                     .select('id, company_name, danger_class')
@@ -1257,7 +1446,7 @@
 
                 dbClient
                     .from('workers')
-                    .select('id', { count: 'exact', head: true })
+                    .select('id, company_id, full_name')
                     .eq('tenant_id', tenantId),
 
                 dbClient
@@ -1291,7 +1480,18 @@
                     .select('*, customer_companies(company_name, tenant_id)')
                     .eq('tenant_id', tenantId)
                     .order('created_at', { ascending: false })
-                    .limit(50)
+                    .limit(50),
+
+                dbClient
+                    .from('training_completions')
+                    .select('*, customer_companies(company_name, tenant_id)')
+                    .eq('tenant_id', tenantId)
+                    .order('updated_at', { ascending: false }),
+
+                dbClient
+                    .from('training_attendance_entries')
+                    .select('id, completion_id, attended_hours')
+                    .eq('tenant_id', tenantId)
             ]);
 
             if (companiesRes.error) throw companiesRes.error;
@@ -1301,6 +1501,8 @@
             if (medicalTestsRes.error) throw medicalTestsRes.error;
             if (healthFollowupsRes.error) throw healthFollowupsRes.error;
             if (nearMissRes.error) throw nearMissRes.error;
+            if (trainingCompletionsRes.error) throw trainingCompletionsRes.error;
+            if (trainingSessionsRes.error) throw trainingSessionsRes.error;
 
             const companies = companiesRes.data || [];
             const risks = risksRes.data || [];
@@ -1308,7 +1510,10 @@
             const medicalTests = medicalTestsRes.data || [];
             const healthFollowups = healthFollowupsRes.data || [];
             const nearMissReports = nearMissRes.data || [];
-            const workerCount = workersRes.count || 0;
+            const trainingCompletions = trainingCompletionsRes.data || [];
+            const trainingSessions = trainingSessionsRes.data || [];
+            const workers = workersRes.data || [];
+            const workerCount = workers.length;
 
             const cokCount = companies.filter(c => (c.danger_class || '').toString().trim().toLowerCase() === 'çok tehlikeli').length;
             const tehlikeCount = companies.filter(c => (c.danger_class || '').toString().trim().toLowerCase() === 'tehlikeli').length;
@@ -1360,6 +1565,7 @@
 
             renderHealthAlerts(medicalTests, healthFollowups, companies, today, weekEnd);
             renderNearMissAlerts(nearMissReports);
+            buildTrainingDashboard(trainingCompletions, trainingSessions, workers, companies, today);
 
             updateOperationalBanner(overdueDofs, openDofs, progressDofs);
             renderPriorityDofs(activeRisks, today);
@@ -1374,6 +1580,8 @@
             if (healthEl) healthEl.innerHTML = '<tr><td colspan="4" class="empty-state" style="color:#b91c1c;">Sağlık uyarıları yüklenemedi.</td></tr>';
             const nearMissEl = document.getElementById('near_miss_alerts_tbody');
             if (nearMissEl) nearMissEl.innerHTML = '<tr><td colspan="4" class="empty-state" style="color:#b91c1c;">Ramak kala bildirimleri yüklenemedi.</td></tr>';
+            const trainingEl = document.getElementById('training_alerts_tbody');
+            if (trainingEl) trainingEl.innerHTML = '<tr><td colspan="4" class="empty-state" style="color:#b91c1c;">Eğitim uyarıları yüklenemedi.</td></tr>';
         }
     }
 
