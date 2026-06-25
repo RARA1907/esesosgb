@@ -109,6 +109,25 @@
           grid-column: span 2;
         }
       }
+      .badge-invite-accepted {
+        background: #ecfdf5;
+        color: #047857;
+      }
+      .badge-invite-sent {
+        background: #eff6ff;
+        color: #1d4ed8;
+      }
+      .badge-invite-notset {
+        background: #fef3c7;
+        color: #b45309;
+      }
+      .resend-link {
+        font-size: 10px;
+        color: #2563eb;
+        text-decoration: underline;
+        cursor: pointer;
+        margin-left: 4px;
+      }
     </style>
   </head>
   <body class="theme-ultra-clean">
@@ -691,13 +710,27 @@
           const dateText = `Giriş: ${s.hire_date || '-'} Çıkış: ${s.termination_date || 'Devam'}`;
           const systemStatusText = isSystemActive ? 'Aktif' : 'Pasif';
 
+          const inviteStatus = s.auth_invite_status || 'not_sent';
+          let inviteBadgeHtml = '';
+          let inviteStatusText = 'Davet gönderilmedi';
+          
+          if (inviteStatus === 'accepted') {
+            inviteStatusText = 'Şifre belirlendi';
+            inviteBadgeHtml = `<br><span class="badge badge-invite-accepted" style="font-size:10px; padding:2px 6px; border-radius:4px; margin-top:4px; display:inline-block;">🟢 Şifre Belirlendi</span>`;
+          } else if (inviteStatus === 'sent') {
+            inviteStatusText = 'Davet gönderildi';
+            inviteBadgeHtml = `<br><span class="badge badge-invite-sent" style="font-size:10px; padding:2px 6px; border-radius:4px; margin-top:4px; display:inline-block;">🔵 Davet Gönderildi</span> <a href="javascript:void(0)" class="resend-link" onclick="sendStaffInvite('${escapeAttr(s.id)}')">Yeniden Gönder</a>`;
+          } else {
+            inviteBadgeHtml = `<br><span class="badge badge-invite-notset" style="font-size:10px; padding:2px 6px; border-radius:4px; margin-top:4px; display:inline-block;">🟡 Davet Gönderilmedi</span> <a href="javascript:void(0)" class="resend-link" onclick="sendStaffInvite('${escapeAttr(s.id)}')">Davet Gönder</a>`;
+          }
+
           return {
             id_attr: escapeAttr(s.id),
             tenant_id_attr: tenantId,
             name_surname: s.name_surname || '-',
             tenant_label_text: tenantText,
             staff_role_text: staffRoleText,
-            access_role_text: `${accessRoleText} ${canLoginValue ? 'Giriş izni var' : 'Giriş kapalı'}`,
+            access_role_text: `${accessRoleText} ${canLoginValue ? 'Giriş izni var' : 'Giriş kapalı'} ${inviteStatusText}`,
             email: s.email || '-',
             hire_date: s.hire_date || '',
             date_text: dateText,
@@ -706,7 +739,7 @@
             name_html: escapeHtml(s.name_surname || '-'),
             tenant_label_html: tenantLabel,
             staff_role_html: `${escapeHtml(s.staff_role || '-')} <br><small style="color:var(--text-muted);">(${escapeHtml(s.certificate_class || '-')})</small>`,
-            access_role_html: `<span class="badge ${accessRole === 'admin' ? 'badge-active' : 'badge-passive'}" style="background:${accessRole === 'admin' ? '#dbeafe' : '#f1f5f9'}; color:${accessRole === 'admin' ? '#1d4ed8' : 'var(--text-muted)'};">${accessRoleText}</span><br><small style="color:var(--text-muted);">${canLoginValue ? 'Giriş izni var' : 'Giriş kapalı'}</small>`,
+            access_role_html: `<span class="badge ${accessRole === 'admin' ? 'badge-active' : 'badge-passive'}" style="background:${accessRole === 'admin' ? '#dbeafe' : '#f1f5f9'}; color:${accessRole === 'admin' ? '#1d4ed8' : 'var(--text-muted)'};">${accessRoleText}</span><br><small style="color:var(--text-muted);">${canLoginValue ? 'Giriş izni var' : 'Giriş kapalı'}</small>${inviteBadgeHtml}`,
             email_html: escapeHtml(s.email || '-'),
             date_html: `Giriş: ${escapeHtml(s.hire_date || '-')}<br>Çıkış: ${escapeHtml(s.termination_date || 'Devam')}`,
             system_status_badge: isSystemActive ? '● AKTİF' : '○ PASİF'
@@ -843,6 +876,54 @@
           return;
         }
         fetchStaff();
+      }
+
+      async function sendStaffInvite(staffId) {
+        if (!confirm('Bu kullanıcıya davet e-postası gönderilsin mi?')) return;
+        try {
+          const { data: { session } } = await dbClient.auth.getSession();
+          if (!session) throw new Error('Oturum bulunamadı. Yeniden giriş yapın.');
+          
+          const { data: staff, error: sErr } = await dbClient
+            .from('osgb_staff')
+            .select('id, email, tenant_id, tenants(slug)')
+            .eq('id', staffId)
+            .single();
+            
+          if (sErr) throw sErr;
+          const slug = staff.tenants && staff.tenants.slug ? staff.tenants.slug : '';
+          
+          const redirectUrl = `${window.location.origin}/login.html?tenant=${encodeURIComponent(slug)}`;
+
+          const resp = await fetch(`${window.SUPABASE_URL}/functions/v1/invite-staff-user`, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json', 
+              'Authorization': `Bearer ${session.access_token}` 
+            },
+            body: JSON.stringify({
+              staff_id: staffId,
+              site_origin: window.location.origin,
+              redirect_to: redirectUrl
+            })
+          });
+          
+          const result = await resp.json().catch(() => ({}));
+          if (!resp.ok || result.ok === false) throw new Error(result.error || JSON.stringify(result));
+          
+          await dbClient
+            .from('osgb_staff')
+            .update({ 
+              auth_invite_status: 'sent', 
+              auth_invited_at: new Date().toISOString() 
+            })
+            .eq('id', staffId);
+            
+          alert('Davet e-postası başarıyla gönderildi.');
+          fetchStaff();
+        } catch (err) {
+          alert('Davet gönderilemedi: ' + (err.message || err));
+        }
       }
     </script>
   </body>
