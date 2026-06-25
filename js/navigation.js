@@ -1,6 +1,16 @@
 // OSGB SaaS Global Yetkilendirme ve Navigasyon Yönetimi
 // Gerçek Supabase auth - mock değil!
 
+// isgnova platform marka favicon'u (her sayfaya enjekte edilir)
+(function injectBrandFavicon() {
+  if (document.querySelector("link[rel='icon']")) return;
+  const link = document.createElement('link');
+  link.rel = 'icon';
+  link.type = 'image/svg+xml';
+  link.href = 'brand/mark.svg';
+  document.head.appendChild(link);
+})();
+
 window.normalizeAccessRole = function (value) {
   const v = (value || '').toString().trim().toLowerCase();
   if (['super_admin', 'super admin', 'saas_admin', 'sistem sahibi'].includes(v)) return 'super_admin';
@@ -176,7 +186,8 @@ window.setTenantBranding = function (tenant) {
 };
 
 window.requireAuthAndRole = async function (page) {
-  if (new URLSearchParams(window.location.search).get('bypass') === 'true') {
+  const isLocalhost = ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+  if (isLocalhost && new URLSearchParams(window.location.search).get('bypass') === 'true') {
     const mockAuth = {
       session: { user: { email: 'mockuzman@eses.com' } },
       canLogin: true,
