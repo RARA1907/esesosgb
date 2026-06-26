@@ -1034,26 +1034,46 @@
         overlay.innerHTML = 'PDF Hazırlanıyor... Lütfen Bekleyin.';
         document.body.appendChild(overlay);
 
-        // Body'ye pdf-rendering class'ını ekle ki .print-only (pdf içeriği) görünür olsun, screen UI gizlensin
-        document.body.classList.add('pdf-rendering');
+        // Kusursuz konumlandırma için yalıtılmış bir klon konteyner oluştur (sol tarafın kesilmemesi için)
+        const tempContainer = document.createElement('div');
+        tempContainer.style.position = 'absolute';
+        tempContainer.style.top = '0';
+        tempContainer.style.left = '0';
+        tempContainer.style.width = '800px';
+        tempContainer.style.zIndex = '-9999'; // Kullanıcı görmesin
+        tempContainer.style.backgroundColor = '#fff';
+        
+        // Orijinal print içeriğini klonla
+        const clone = document.getElementById('pdf-print-content').cloneNode(true);
+        clone.classList.remove('print-only'); // Artık ekranda görünebilir olmalı
+        clone.style.display = 'block';
+        clone.style.width = '100%';
+        clone.style.margin = '0';
+        clone.style.padding = '30px'; // CSS'teki paddingi garanti altına al
+        clone.style.boxSizing = 'border-box';
+        
+        // Tabloyu zorla göster
+        const printTable = clone.querySelector('#print_services_table');
+        if (printTable) printTable.style.setProperty('display', 'table', 'important');
+        
+        tempContainer.appendChild(clone);
+        document.body.appendChild(tempContainer);
 
-        // Tarayıcının yeni CSS kurallarını uygulayıp DOM'u çizmesi için biraz bekle
+        // Tarayıcının yeni DOM'u çizmesi için bekle
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        // PDF ayarları
+        // PDF ayarları (x ve y 0 olarak sabitlenerek kayma önlenir)
         const opt = {
           margin:       10,
           filename:     offerNo + '.pdf',
           image:        { type: 'jpeg', quality: 1 },
-          html2canvas:  { scale: 2, useCORS: true, windowWidth: 800 },
+          html2canvas:  { scale: 2, useCORS: true, windowWidth: 800, x: 0, y: 0, scrollX: 0, scrollY: 0 },
           jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
         try {
-          // html2pdf'e document.body yerine SADECE pdf-print-content elementini veriyoruz.
-          // Böylece overlay gibi ekranı kapatan harici elementler PDF'in içine girmez!
-          const targetElement = document.getElementById('pdf-print-content');
-          const pdfBlob = await html2pdf().set(opt).from(targetElement).output('blob');
+          // Doğrudan yalıtılmış klonu (tempContainer) render et
+          const pdfBlob = await html2pdf().set(opt).from(tempContainer).output('blob');
           
           const fileName = offerNo.replace(/[^a-zA-Z0-9_-]/g, '') + '_' + Date.now() + '.pdf';
           
@@ -1088,8 +1108,8 @@
           console.error("Bulut PDF Hatası:", e);
           return null;
         } finally {
-          // PDF oluşturma bitince her şeyi eski haline çevir
-          document.body.classList.remove('pdf-rendering');
+          // Temizlik
+          document.body.removeChild(tempContainer);
           document.body.removeChild(overlay);
         }
       }
