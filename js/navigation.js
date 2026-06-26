@@ -4,6 +4,19 @@
 window.CUSTOM_ROLES = {}; // key: role_key, value: role_name
 window.ROLE_PERMISSIONS = []; // array of { role, page, can_view, can_action }
 
+// Apply saved theme palette on load
+(function() {
+  const savedPalette = localStorage.getItem('isgnova_palette');
+  if (savedPalette && document.body) {
+    document.body.classList.add(savedPalette);
+  } else if (savedPalette) {
+    document.addEventListener('DOMContentLoaded', () => {
+       document.body.classList.add(savedPalette);
+    });
+  }
+})();
+
+
 window.loadTenantCustomRolesAndPermissions = async function (tenantId) {
   if (!window.dbClient || !tenantId) return;
   try {

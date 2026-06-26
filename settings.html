@@ -133,15 +133,16 @@
         <h1 class="transfer-page-title" style="margin-top: 10px;">⚙️ Genel Ayarlar</h1>
         <p class="transfer-page-desc">Sistem ayarlarınızı, tema/dil tercihlerinizi ve veri aktarımı işlemlerini bu alandan yönetebilirsiniz.</p>
 
-        <div class="settings-tabs" style="display: flex; gap: 24px; margin-bottom: 24px; border-bottom: 1px solid #e2e8f0; padding-bottom: 0;">
-            <a href="#" style="text-decoration:none; color:var(--transfer-indigo); font-weight:600; border-bottom:2px solid var(--transfer-indigo); padding-bottom:12px; margin-bottom:-1px; font-size: 14.5px;">🔄 Veri Aktarımı</a>
-            <a href="#" style="text-decoration:none; color:#64748b; font-weight:500; padding-bottom:12px; cursor:pointer; font-size: 14.5px;" onclick="alert('Yakında eklenecek')">🎨 Görünüm & Tema</a>
-            <a href="#" style="text-decoration:none; color:#64748b; font-weight:500; padding-bottom:12px; cursor:pointer; font-size: 14.5px;" onclick="alert('Yakında eklenecek')">🌍 Dil & Bölge</a>
+        <div class="settings-tabs" id="settings_tabs" style="display: flex; gap: 24px; margin-bottom: 24px; border-bottom: 1px solid #e2e8f0; padding-bottom: 0;">
+            <a href="#" onclick="switchSettingsTab('transfer', this)" style="text-decoration:none; color:var(--transfer-indigo); font-weight:600; border-bottom:2px solid var(--transfer-indigo); padding-bottom:12px; margin-bottom:-1px; font-size: 14.5px;">🔄 Veri Aktarımı</a>
+            <a href="#" onclick="switchSettingsTab('theme', this)" style="text-decoration:none; color:#64748b; font-weight:500; padding-bottom:12px; cursor:pointer; font-size: 14.5px;">🎨 Görünüm & Tema</a>
+            <a href="#" onclick="alert('Yakında eklenecek')" style="text-decoration:none; color:#64748b; font-weight:500; padding-bottom:12px; cursor:pointer; font-size: 14.5px;">🌍 Dil & Bölge</a>
         </div>
 
         <div id="status_banner" class="import-status-bar" style="display:none; margin-bottom: 20px;"></div>
 
-        <div class="transfer-grid">
+        <div id="tab_transfer">
+          <div class="transfer-grid">
 
           <!-- DIŞA AKTAR KARTI -->
           <div class="transfer-card">
@@ -263,8 +264,25 @@
                 </div>
             </div>
           </div>
+        </div> <!-- end transfer-grid -->
+        </div> <!-- end tab_transfer -->
 
+        <div id="tab_theme" style="display:none;">
+          <div style="background: #f8fafc; padding: 24px; border-radius: 12px; border: 1px solid #e2e8f0; max-width: 600px;">
+              <h3 style="margin-top:0; font-size: 16px; color: #0f172a;">Tema Renk Paleti</h3>
+              <p style="font-size: 13px; color: #475569; margin-bottom: 20px;">Sistemin genelinde kullanılacak vurgu (primary) rengini seçin. Seçtiğiniz renk tarayıcınızda hatırlanır.</p>
+              
+              <div style="display:flex; gap:16px; flex-wrap: wrap;">
+                  <div onclick="setThemePalette('')" style="width: 40px; height: 40px; border-radius: 50%; background: #0E7C86; cursor: pointer; border: 2px solid transparent; box-shadow:0 2px 4px rgba(0,0,0,0.1);" title="Turkuaz (Varsayılan)"></div>
+                  <div onclick="setThemePalette('theme-palette-blue')" style="width: 40px; height: 40px; border-radius: 50%; background: #2563EB; cursor: pointer; border: 2px solid transparent; box-shadow:0 2px 4px rgba(0,0,0,0.1);" title="Mavi"></div>
+                  <div onclick="setThemePalette('theme-palette-emerald')" style="width: 40px; height: 40px; border-radius: 50%; background: #059669; cursor: pointer; border: 2px solid transparent; box-shadow:0 2px 4px rgba(0,0,0,0.1);" title="Zümrüt Yeşili"></div>
+                  <div onclick="setThemePalette('theme-palette-purple')" style="width: 40px; height: 40px; border-radius: 50%; background: #7C3AED; cursor: pointer; border: 2px solid transparent; box-shadow:0 2px 4px rgba(0,0,0,0.1);" title="Mor"></div>
+                  <div onclick="setThemePalette('theme-palette-rose')" style="width: 40px; height: 40px; border-radius: 50%; background: #E11D48; cursor: pointer; border: 2px solid transparent; box-shadow:0 2px 4px rgba(0,0,0,0.1);" title="Gül Kurusu"></div>
+                  <div onclick="setThemePalette('theme-palette-slate')" style="width: 40px; height: 40px; border-radius: 50%; background: #475569; cursor: pointer; border: 2px solid transparent; box-shadow:0 2px 4px rgba(0,0,0,0.1);" title="Koyu Gri"></div>
+              </div>
+          </div>
         </div>
+
       </div>
     </div>
 
@@ -688,12 +706,45 @@
             }
           });
         }
-
+      });
+          document.addEventListener('DOMContentLoaded', async () => {
         const auth = await requireAuthAndRole('crm');
         if (!auth) return;
         CURRENT_AUTH = auth;
         await loadLeadCount();
       });
+
+      async function loadLeadCount() {
+        // Just refresh page or logic
+      }
+      
+      // -- AYARLAR SEKME & TEMA YÖNETİMİ --
+      function switchSettingsTab(tabName, el) {
+        document.querySelectorAll('#settings_tabs a').forEach(a => {
+            a.style.color = '#64748b';
+            a.style.fontWeight = '500';
+            a.style.borderBottom = 'none';
+        });
+        el.style.color = 'var(--transfer-indigo)';
+        el.style.fontWeight = '600';
+        el.style.borderBottom = '2px solid var(--transfer-indigo)';
+
+        document.getElementById('tab_transfer').style.display = tabName === 'transfer' ? 'block' : 'none';
+        document.getElementById('tab_theme').style.display = tabName === 'theme' ? 'block' : 'none';
+      }
+
+      function setThemePalette(palette) {
+        const palettes = ['theme-palette-blue', 'theme-palette-emerald', 'theme-palette-purple', 'theme-palette-rose', 'theme-palette-slate'];
+        document.body.classList.remove(...palettes);
+        if (palette) {
+            document.body.classList.add(palette);
+            localStorage.setItem('isgnova_palette', palette);
+        } else {
+            localStorage.removeItem('isgnova_palette');
+        }
+        showToast('Tema rengi değiştirildi.', 'success');
+      }
+
     </script>
   </body>
 </html>
