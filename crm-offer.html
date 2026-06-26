@@ -1034,6 +1034,9 @@
         // Print css kurallarını JS olmadan tetiklemek için class ekle
         document.body.classList.add('pdf-rendering');
 
+        // Tarayıcının yeni CSS kurallarını uygulayıp sayfayı çizmesine (layout reflow) zaman tanıyalım
+        await new Promise(resolve => setTimeout(resolve, 300));
+
         const opt = {
           margin:       0,
           filename:     offerNo + '.pdf',
