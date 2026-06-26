@@ -960,7 +960,7 @@
 
         let bodyText = 'Sayın İlgili,\n\nİSG hizmetleri teklifimiz (No: ' + offerNo + ') değerlendirmeniz için tarafınıza sunulmuştur.\n\n';
         if (publicUrl) {
-          bodyText += 'Teklif PDF dosyasını görüntülemek veya indirmek için lütfen aşağıdaki bağlantıya tıklayın:\n' + publicUrl + '\n\n';
+          bodyText += 'Teklif PDF dosyasını görüntülemek veya indirmek için lütfen aşağıdaki bağlantıya tıklayın:\n<' + publicUrl + '>\n\n';
         }
         bodyText += 'İyi çalışmalar dileriz.';
 
@@ -1015,24 +1015,31 @@
 
         // Create a temporary container for PDF generation
         const container = document.createElement('div');
+        container.className = 'theme-ultra-clean'; // Fontların çalışması için
         container.style.position = 'absolute';
-        container.style.left = '-9999px';
+        container.style.left = '0';
         container.style.top = '0';
+        container.style.zIndex = '-9999'; // Sayfanın arkasında kalsın
         container.style.width = '800px';
         container.style.backgroundColor = '#fff';
-        container.style.padding = '20px';
+        container.style.padding = '30px';
         document.body.appendChild(container);
 
         const headerNode = document.getElementById('pdf-header').cloneNode(true);
         const tableNode = document.getElementById('print_services_table').parentNode.cloneNode(true);
         const footerNode = document.getElementById('pdf-footer').cloneNode(true);
         
-        // Remove .print-only classes to make them visible to html2pdf
+        // Remove .print-only classes and force inline display
         headerNode.classList.remove('print-only');
-        tableNode.classList.remove('print-only');
-        footerNode.classList.remove('print-only');
+        headerNode.style.display = 'block';
         
-        // Ensure table itself is visible if it has inline none
+        tableNode.classList.remove('print-only');
+        tableNode.style.display = 'block';
+        
+        footerNode.classList.remove('print-only');
+        footerNode.style.display = 'flex';
+        
+        // Ensure table itself is visible
         const tbl = tableNode.querySelector('table');
         if (tbl) tbl.style.display = 'table';
 
@@ -1043,8 +1050,8 @@
         const opt = {
           margin:       10,
           filename:     offerNo + '.pdf',
-          image:        { type: 'jpeg', quality: 0.98 },
-          html2canvas:  { scale: 2 },
+          image:        { type: 'jpeg', quality: 1 },
+          html2canvas:  { scale: 2, useCORS: true, windowWidth: 800 },
           jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 

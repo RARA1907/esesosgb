@@ -985,7 +985,7 @@
         
         let bodyText = 'Sayın İlgili,\n\nİSG hizmetleri teklifimiz (No: ' + offerNo + ') değerlendirmeniz için tarafınıza sunulmuştur.\n\n';
         if (drawerCurrentOffer.pdf_url) {
-          bodyText += 'Teklif PDF dosyasını görüntülemek veya indirmek için lütfen aşağıdaki bağlantıya tıklayın:\n' + drawerCurrentOffer.pdf_url + '\n\n';
+          bodyText += 'Teklif PDF dosyasını görüntülemek veya indirmek için lütfen aşağıdaki bağlantıya tıklayın:\n<' + drawerCurrentOffer.pdf_url + '>\n\n';
         }
         bodyText += 'İyi çalışmalar dileriz.';
 
