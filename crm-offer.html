@@ -1034,32 +1034,13 @@
         overlay.innerHTML = 'PDF Hazırlanıyor... Lütfen Bekleyin.';
         document.body.appendChild(overlay);
 
-        // Kusursuz konumlandırma için yalıtılmış bir klon konteyner oluştur (sol tarafın kesilmemesi için)
-        const tempContainer = document.createElement('div');
-        tempContainer.style.position = 'absolute';
-        tempContainer.style.top = '0';
-        tempContainer.style.left = '0';
-        tempContainer.style.width = '800px';
-        tempContainer.style.zIndex = '-9999'; // Kullanıcı görmesin
-        tempContainer.style.backgroundColor = '#fff';
-        
-        // Orijinal print içeriğini klonla
-        const clone = document.getElementById('pdf-print-content').cloneNode(true);
-        clone.classList.remove('print-only'); // Artık ekranda görünebilir olmalı
-        clone.style.display = 'block';
-        clone.style.width = '100%';
-        clone.style.margin = '0';
-        clone.style.padding = '30px'; // CSS'teki paddingi garanti altına al
-        clone.style.boxSizing = 'border-box';
-        
-        // Tabloyu zorla göster
-        const printTable = clone.querySelector('#print_services_table');
-        if (printTable) printTable.style.setProperty('display', 'table', 'important');
-        
-        tempContainer.appendChild(clone);
-        document.body.appendChild(tempContainer);
+        // Sayfayı en başa kaydır (html2canvas'ın scroll kaymalarını önlemek için)
+        window.scrollTo(0, 0);
 
-        // Tarayıcının yeni DOM'u çizmesi için bekle
+        // Body'ye pdf-rendering class'ını ekle ki .print-only (pdf içeriği) görünür olsun, screen UI gizlensin
+        document.body.classList.add('pdf-rendering');
+
+        // Tarayıcının yeni CSS kurallarını uygulayıp DOM'u çizmesi için biraz bekle
         await new Promise(resolve => setTimeout(resolve, 500));
 
         // PDF ayarları (x ve y 0 olarak sabitlenerek kayma önlenir)
@@ -1072,8 +1053,9 @@
         };
 
         try {
-          // Doğrudan yalıtılmış klonu (tempContainer) render et
-          const pdfBlob = await html2pdf().set(opt).from(tempContainer).output('blob');
+          // html2pdf'e SADECE pdf-print-content elementini veriyoruz.
+          const targetElement = document.getElementById('pdf-print-content');
+          const pdfBlob = await html2pdf().set(opt).from(targetElement).output('blob');
           
           const fileName = offerNo.replace(/[^a-zA-Z0-9_-]/g, '') + '_' + Date.now() + '.pdf';
           
@@ -1108,8 +1090,8 @@
           console.error("Bulut PDF Hatası:", e);
           return null;
         } finally {
-          // Temizlik
-          document.body.removeChild(tempContainer);
+          // PDF oluşturma bitince her şeyi eski haline çevir
+          document.body.classList.remove('pdf-rendering');
           document.body.removeChild(overlay);
         }
       }

@@ -511,6 +511,11 @@ body.pdf-rendering .offer-layout {
 
 body.pdf-rendering .print-only {
   display: block !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
+  margin: 0 !important;
+  transform: none !important;
 }
 
 body.pdf-rendering .form-section {
