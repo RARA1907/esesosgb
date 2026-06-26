@@ -1,0 +1,14 @@
+﻿Metrik,Değer
+Sözleşmeler Summary kayıt sayısı,1727
+Cari Master kayıt sayısı,6252
+Eşleşen sözleşme kaydı,1694
+Eşleşmeyen sözleşme kaydı,33
+Eşleşme oranı,0.98089171974522293
+Eşleşmeyen cari kayıt sayısı,4753
+,
+Eşleşme Metodu,Adet
+EXACT_CLEAN,1275
+FUZZY_FIRSTTOKEN_CORE,201
+EXACT_CORE,192
+EXACT_COMPACT,24
+EXACT_SORTED,2
