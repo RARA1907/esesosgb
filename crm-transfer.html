@@ -238,6 +238,32 @@
                     </div>
                 </div>
 
+          </div>
+
+          <!-- FIRSAT (LEAD) AKTARIM KARTI -->
+          <div class="transfer-card" style="grid-column: 1 / -1; margin-top: 24px;">
+            <div class="transfer-card-header">
+              <div class="transfer-icon-wrap icon-import" style="background:#fef3c7; color:#d97706;">🎯</div>
+              <div>
+                <p class="transfer-card-title">Fırsat (Lead) İçe Aktarımı</p>
+                <p class="transfer-card-sub">Henüz sözleşme imzalanmamış, görüşme veya teklif aşamasındaki potansiyel müşterilerinizi yükleyin.</p>
+              </div>
+            </div>
+            <hr class="transfer-divider" />
+            
+            <div style="display: flex; gap: 24px; flex-wrap: wrap; align-items: center;">
+                <div style="flex: 1; min-width: 280px;">
+                    <p style="font-size: 13px; color: #475569; margin-bottom: 12px;">Fırsat müşterilerinizin doğrudan CRM paneline düşmesi için aşağıdaki şablonu kullanın.</p>
+                    <a href="templates/5_Firsat_Musterileri_Sablonu.csv" download class="btn-transfer-sample" style="display:inline-block; padding: 8px 16px; font-size: 13px;">📋 Fırsat Müşterileri Şablonu İndir</a>
+                </div>
+
+                <div style="flex: 1; min-width: 280px;">
+                    <div class="file-drop-zone" onclick="document.getElementById('import_stage_lead').click()" style="padding: 16px;">
+                      <input type="file" id="import_stage_lead" accept=".csv" style="display:none;" onchange="onFileSelectedStage(this, 0)" />
+                      <span class="drop-icon" style="font-size: 24px; margin-bottom: 8px;">📁</span>
+                      <div style="font-size: 12px;">Fırsat CSV Yükle</div>
+                    </div>
+                </div>
             </div>
           </div>
 
@@ -403,7 +429,9 @@
                const parsed = parseCSVText(e.target.result);
                if (parsed.length < 2) throw new Error("Dosyada veri bulunamadı.");
                
-               if (stage === 1) {
+               if (stage === 0) {
+                  await processStage0(parsed);
+               } else if (stage === 1) {
                   await processStage1(parsed);
                } else if (stage === 2) {
                   await processStage2(parsed);
@@ -411,9 +439,11 @@
                   await processStage3(parsed);
                }
                
-               showStatus('✓ Aşama ' + stage + ' başarıyla içeri aktarıldı!', 'success');
+               let stageName = stage === 0 ? 'Fırsatlar' : stage;
+               showStatus('✓ Aşama ' + stageName + ' başarıyla içeri aktarıldı!', 'success');
                showToast('Aktarım tamamlandı.', 'success');
                input.value = ''; // Reset input
+               if (stage === 0) await loadLeadCount();
             } catch(err) {
                console.error(err);
                showStatus('Hata: ' + err.message, 'error');
@@ -421,6 +451,39 @@
          };
          reader.readAsText(file);
       };
+
+      async function processStage0(parsed) {
+        // Fırsat Müşterileri (crm_leads)
+        const rows = [];
+        for (let i = 1; i < parsed.length; i++) {
+          const r = parsed[i];
+          if (!r[0] || !r[0].trim()) continue;
+          const stageRaw = r[7] ? r[7].trim() : 'Yeni Kayıt';
+          const statusRaw = r[8] ? r[8].trim() : 'Fırsat';
+          const validStatuses = ['Fırsat','İşlemde','Kazanıldı','Kaybedildi','Askıda'];
+          
+          rows.push({
+            tenant_id: CURRENT_AUTH.tenant_id,
+            company_name: r[0].trim(),
+            city: r[1]?r[1].trim():null,
+            district: r[2]?r[2].trim():null,
+            sector: r[3]?r[3].trim():null,
+            nace_code: r[4]?r[4].trim():null,
+            danger_class: r[5]?r[5].trim():null,
+            employee_count: r[6]?parseInt(r[6].trim())||null:null,
+            stage: stageToDbValue(normalizeStage(stageRaw)),
+            lead_status: validStatuses.includes(statusRaw) ? statusRaw : 'Fırsat',
+            lead_source: r[9]?r[9].trim():'Telefon',
+            notes: r[10]?r[10].trim():null,
+            created_by: CURRENT_AUTH.email
+          });
+        }
+        if (rows.length === 0) throw new Error("Geçerli fırsat verisi bulunamadı.");
+        showStatus(rows.length + ' fırsat müşterisi yükleniyor...', '');
+
+        const { error } = await dbClient.from('crm_leads').insert(rows);
+        if (error) throw error;
+      }
 
       async function processStage1(parsed) {
         const header = parsed[0].join(';');
