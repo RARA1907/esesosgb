@@ -453,36 +453,90 @@
       };
 
       async function processStage0(parsed) {
-        // Fırsat Müşterileri (crm_leads)
-        const rows = [];
+        // Fırsat Müşterileri (crm_leads) ve Kişileri (crm_contacts)
+        const leadsToInsert = [];
+        const contactsMap = {}; // company_name -> contact object
+
         for (let i = 1; i < parsed.length; i++) {
           const r = parsed[i];
           if (!r[0] || !r[0].trim()) continue;
-          const stageRaw = r[7] ? r[7].trim() : 'Yeni Kayıt';
-          const statusRaw = r[8] ? r[8].trim() : 'Fırsat';
+          
+          // Yeni Sıra:
+          // 0:Firma Adı, 1:Vergi Dairesi, 2:Vergi No, 3:Şehir, 4:İlçe, 5:Adres, 
+          // 6:Sektör, 7:Nace Kodu, 8:Tehlike Sınıfı, 9:Çalışan Sayısı, 
+          // 10:Aşama, 11:Durum, 12:Kaynak, 13:Notlar, 
+          // 14:Yetkili Kişi, 15:Yetkili Unvan, 16:Yetkili Telefon, 17:Yetkili E-Posta
+          
+          const companyName = r[0].trim();
+          const stageRaw = r[10] ? r[10].trim() : 'Yeni Kayıt';
+          const statusRaw = r[11] ? r[11].trim() : 'Fırsat';
           const validStatuses = ['Fırsat','İşlemde','Kazanıldı','Kaybedildi','Askıda'];
           
-          rows.push({
+          leadsToInsert.push({
             tenant_id: CURRENT_AUTH.tenant_id,
-            company_name: r[0].trim(),
-            city: r[1]?r[1].trim():null,
-            district: r[2]?r[2].trim():null,
-            sector: r[3]?r[3].trim():null,
-            nace_code: r[4]?r[4].trim():null,
-            danger_class: r[5]?r[5].trim():null,
-            employee_count: r[6]?parseInt(r[6].trim())||null:null,
+            company_name: companyName,
+            tax_office: r[1]?r[1].trim():null,
+            tax_no: r[2]?r[2].trim():null,
+            city: r[3]?r[3].trim():null,
+            district: r[4]?r[4].trim():null,
+            address: r[5]?r[5].trim():null,
+            sector: r[6]?r[6].trim():null,
+            nace_code: r[7]?r[7].trim():null,
+            danger_class: r[8]?r[8].trim():null,
+            employee_count: r[9]?parseInt(r[9].trim())||null:null,
             stage: stageToDbValue(normalizeStage(stageRaw)),
             lead_status: validStatuses.includes(statusRaw) ? statusRaw : 'Fırsat',
-            lead_source: r[9]?r[9].trim():'Telefon',
-            notes: r[10]?r[10].trim():null,
+            lead_source: r[12]?r[12].trim():'Telefon',
+            notes: r[13]?r[13].trim():null,
             created_by: CURRENT_AUTH.email
           });
-        }
-        if (rows.length === 0) throw new Error("Geçerli fırsat verisi bulunamadı.");
-        showStatus(rows.length + ' fırsat müşterisi yükleniyor...', '');
 
-        const { error } = await dbClient.from('crm_leads').insert(rows);
-        if (error) throw error;
+          // Eğer yetkili kişi adı varsa map'e ekle
+          if (r[14] && r[14].trim()) {
+             contactsMap[companyName] = {
+                full_name: r[14].trim(),
+                title: r[15]?r[15].trim():null,
+                phone: r[16]?r[16].trim():null,
+                email: r[17]?r[17].trim():null
+             };
+          }
+        }
+        
+        if (leadsToInsert.length === 0) throw new Error("Geçerli fırsat verisi bulunamadı.");
+        showStatus(leadsToInsert.length + ' fırsat müşterisi yükleniyor...', '');
+
+        const { data: insertedLeads, error: leadError } = await dbClient
+           .from('crm_leads')
+           .insert(leadsToInsert)
+           .select('id, company_name');
+           
+        if (leadError) throw leadError;
+
+        // Şimdi İletişim Kişilerini (Contacts) ekleyelim
+        const contactsToInsert = [];
+        if (insertedLeads) {
+           for (const lead of insertedLeads) {
+              const contactInfo = contactsMap[lead.company_name];
+              if (contactInfo) {
+                 contactsToInsert.push({
+                    tenant_id: CURRENT_AUTH.tenant_id,
+                    lead_id: lead.id,
+                    full_name: contactInfo.full_name,
+                    title: contactInfo.title,
+                    phone: contactInfo.phone,
+                    email: contactInfo.email,
+                    is_primary: true
+                 });
+              }
+           }
+        }
+
+        if (contactsToInsert.length > 0) {
+           showStatus(contactsToInsert.length + ' iletişim kişisi yükleniyor...', '');
+           const { error: contactError } = await dbClient.from('crm_contacts').insert(contactsToInsert);
+           if (contactError) console.error("Kişiler yüklenirken hata:", contactError);
+           // Kişiler hata verse bile lead'ler yüklendiği için throw atmıyoruz, logluyoruz.
+        }
       }
 
       async function processStage1(parsed) {
