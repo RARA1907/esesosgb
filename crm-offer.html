@@ -1013,42 +1013,29 @@
         document.getElementById('p_footer_left').textContent = 'Bu teklif ' + (CURRENT_AUTH?.tenant?.name || 'OSGB') + ' tarafından hazırlanmıştır.';
         document.getElementById('p_footer_right').textContent = 'Teklif No: ' + offerNo + ' · Tarih: ' + now;
 
-        // Create a temporary container for PDF generation
-        const container = document.createElement('div');
-        container.className = 'theme-ultra-clean'; // Fontların çalışması için
-        container.style.position = 'absolute';
-        container.style.left = '0';
-        container.style.top = '0';
-        container.style.zIndex = '-9999'; // Sayfanın arkasında kalsın
-        container.style.width = '800px';
-        container.style.backgroundColor = '#fff';
-        container.style.padding = '30px';
-        document.body.appendChild(container);
+        // Geçici Loading Ekranı (Kullanıcının pdf-rendering'i görmemesi için)
+        const overlay = document.createElement('div');
+        overlay.style.position = 'fixed';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.backgroundColor = '#fff';
+        overlay.style.zIndex = '999999';
+        overlay.style.display = 'flex';
+        overlay.style.alignItems = 'center';
+        overlay.style.justifyContent = 'center';
+        overlay.style.fontSize = '18px';
+        overlay.style.fontWeight = 'bold';
+        overlay.style.color = 'var(--primary)';
+        overlay.innerHTML = 'PDF Hazırlanıyor... Lütfen Bekleyin.';
+        document.body.appendChild(overlay);
 
-        const headerNode = document.getElementById('pdf-header').cloneNode(true);
-        const tableNode = document.getElementById('print_services_table').parentNode.cloneNode(true);
-        const footerNode = document.getElementById('pdf-footer').cloneNode(true);
-        
-        // Remove .print-only classes and force inline display
-        headerNode.classList.remove('print-only');
-        headerNode.style.display = 'block';
-        
-        tableNode.classList.remove('print-only');
-        tableNode.style.display = 'block';
-        
-        footerNode.classList.remove('print-only');
-        footerNode.style.display = 'flex';
-        
-        // Ensure table itself is visible
-        const tbl = tableNode.querySelector('table');
-        if (tbl) tbl.style.display = 'table';
-
-        container.appendChild(headerNode);
-        container.appendChild(tableNode);
-        container.appendChild(footerNode);
+        // Print css kurallarını JS olmadan tetiklemek için class ekle
+        document.body.classList.add('pdf-rendering');
 
         const opt = {
-          margin:       10,
+          margin:       0,
           filename:     offerNo + '.pdf',
           image:        { type: 'jpeg', quality: 1 },
           html2canvas:  { scale: 2, useCORS: true, windowWidth: 800 },
@@ -1056,7 +1043,9 @@
         };
 
         try {
-          const pdfBlob = await html2pdf().set(opt).from(container).output('blob');
+          const pdfBlob = await html2pdf().set(opt).from(document.body).output('blob');
+          
+          document.body.classList.remove('pdf-rendering');
           
           const fileName = offerNo.replace(/[^a-zA-Z0-9_-]/g, '') + '_' + Date.now() + '.pdf';
           
@@ -1089,9 +1078,10 @@
           return publicUrl;
         } catch (e) {
           console.error("Bulut PDF Hatası:", e);
+          document.body.classList.remove('pdf-rendering');
           return null;
         } finally {
-          document.body.removeChild(container);
+          document.body.removeChild(overlay);
         }
       }
 

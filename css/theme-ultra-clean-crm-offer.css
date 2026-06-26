@@ -487,6 +487,73 @@ body.theme-ultra-clean .crm-offer-page-shell {
   }
 }
 
+/* ── BULUT PDF (html2pdf) İÇİN SANAL YAZICI GÖRÜNÜMÜ ── */
+body.pdf-rendering {
+  display: block !important;
+  background: #fff !important;
+  padding: 0 !important;
+  margin: 0;
+  font-family: 'Manrope', sans-serif;
+  color: #111827;
+}
+
+body.pdf-rendering .global-header,
+body.pdf-rendering .nav-container,
+body.pdf-rendering .offer-layout > div:last-child,
+body.pdf-rendering .back-bar,
+body.pdf-rendering .btn-del,
+body.pdf-rendering .btn-add-svc,
+body.pdf-rendering .quick-pills,
+body.pdf-rendering .form-section:last-of-type,
+body.pdf-rendering .save-row {
+  display: none !important;
+}
+
+body.pdf-rendering .card {
+  box-shadow: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+}
+body.pdf-rendering .offer-layout {
+  grid-template-columns: 1fr !important;
+}
+
+body.pdf-rendering .print-only {
+  display: block !important;
+}
+
+body.pdf-rendering .form-section {
+  border: 1px solid #e5e7eb !important;
+  border-radius: 8px !important;
+  break-inside: avoid;
+  margin-bottom: 12px !important;
+  padding: 14px 16px !important;
+}
+body.pdf-rendering .form-section h4 {
+  font-size: 12px !important;
+}
+
+body.pdf-rendering input,
+body.pdf-rendering select,
+body.pdf-rendering textarea {
+  border: none !important;
+  background: transparent !important;
+  padding: 2px 0 !important;
+  font-size: 12px !important;
+  box-shadow: none !important;
+}
+
+body.pdf-rendering #print_services_table {
+  display: table !important;
+}
+body.pdf-rendering .svc-header,
+body.pdf-rendering .service-row {
+  display: none !important;
+}
+body.pdf-rendering #services_list {
+  display: none !important;
+}
+
 /* Print-only PDF header */
 #pdf-header {
   padding: 0;
