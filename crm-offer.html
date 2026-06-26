@@ -105,7 +105,7 @@
     <!-- ═══════════════════════════════════════════
          SCREEN UI
     ════════════════════════════════════════════ -->
-    <div class="card">
+    <div class="card" id="screen-ui">
       <div class="global-header">
         <div class="top-row">
           <div class="logo-area"><span id="lbl_osgb_title">isgnova</span> <span class="logo-badge">SaaS</span></div>
@@ -1016,41 +1016,40 @@
         document.getElementById('p_footer_left').textContent = 'Bu teklif ' + (CURRENT_AUTH?.tenant?.name || 'OSGB') + ' tarafından hazırlanmıştır.';
         document.getElementById('p_footer_right').textContent = 'Teklif No: ' + offerNo + ' · Tarih: ' + now;
 
-        // Geçici Loading Ekranı (Kullanıcının pdf-rendering'i görmemesi için)
-        const overlay = document.createElement('div');
-        overlay.setAttribute('data-html2canvas-ignore', 'true');
-        overlay.style.position = 'fixed';
-        overlay.style.top = '0';
-        overlay.style.left = '0';
-        overlay.style.width = '100%';
-        overlay.style.height = '100%';
-        overlay.style.backgroundColor = '#fff';
-        overlay.style.zIndex = '999999';
-        overlay.style.display = 'flex';
-        overlay.style.alignItems = 'center';
-        overlay.style.justifyContent = 'center';
-        overlay.style.fontSize = '18px';
-        overlay.style.fontWeight = 'bold';
-        overlay.style.color = 'var(--primary)';
-        overlay.innerHTML = 'PDF Hazırlanıyor... Lütfen Bekleyin.';
-        document.body.appendChild(overlay);
+        // Klon oluştur (Ekranda görünmeyen, ama pdf için kullanılacak container)
+        const tempContainer = document.createElement('div');
+        tempContainer.style.position = 'absolute';
+        tempContainer.style.top = '-9999px';
+        tempContainer.style.left = '0';
+        tempContainer.style.width = '800px';
+        tempContainer.style.backgroundColor = '#fff';
+        
+        // Print edilecek içeriği al ve klonla
+        const clone = document.getElementById('pdf-print-content').cloneNode(true);
+        // Print-only class'ını kaldır ki normal ekranda da görünsün (pdf oluşturucu için)
+        clone.classList.remove('print-only');
+        clone.style.display = 'block';
+        
+        // Gizli olan pdf tablosunu görünür yap
+        const printTable = clone.querySelector('#print_services_table');
+        if (printTable) printTable.style.setProperty('display', 'table', 'important');
+        
+        tempContainer.appendChild(clone);
+        document.body.appendChild(tempContainer);
 
-        const wrapper = document.getElementById('pdf-print-content');
-        wrapper.classList.add('pdf-active');
-
-        // Tarayıcının yeni CSS kurallarını uygulayıp sayfayı çizmesine (layout reflow) zaman tanıyalım
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Resimlerin ve fontların tam yüklenmesini beklemek için biraz süre tanıyalım
+        await new Promise(resolve => setTimeout(resolve, 500));
 
         const opt = {
           margin:       10,
           filename:     offerNo + '.pdf',
           image:        { type: 'jpeg', quality: 1 },
-          html2canvas:  { scale: 2, useCORS: true, windowWidth: 800, scrollX: 0, scrollY: 0 },
+          html2canvas:  { scale: 2, useCORS: true, windowWidth: 800 },
           jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
         try {
-          const pdfBlob = await html2pdf().set(opt).from(wrapper).output('blob');
+          const pdfBlob = await html2pdf().set(opt).from(tempContainer).output('blob');
           
           const fileName = offerNo.replace(/[^a-zA-Z0-9_-]/g, '') + '_' + Date.now() + '.pdf';
           
@@ -1085,8 +1084,7 @@
           console.error("Bulut PDF Hatası:", e);
           return null;
         } finally {
-          wrapper.classList.remove('pdf-active');
-          document.body.removeChild(overlay);
+          document.body.removeChild(tempContainer);
         }
       }
 

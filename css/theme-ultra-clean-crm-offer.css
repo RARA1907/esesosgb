@@ -432,7 +432,8 @@ body.theme-ultra-clean .crm-offer-page-shell {
   .quick-pills,
   .form-section:last-of-type,
   .save-row,
-  .card {
+  .card,
+  #screen-ui {
     display: none !important;
   }
   .offer-layout {
