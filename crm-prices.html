@@ -172,10 +172,7 @@
             </p>
           </div>
           <div class="filter-group">
-            <label style="font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-color);margin-right:8px;">
-              <input type="checkbox" id="update_active_offers" style="width:16px;height:16px;cursor:pointer;" checked />
-              ⚡ Aktif Teklifleri Yeni Revizyon Olarak Güncelle
-            </label>
+            <button class="btn btn-secondary" style="background:#e0f2fe; border-color:#bae6fd; color:#0369a1;" onclick="handleBulkOffersUpdateClick()">Teklifleri Yeni Revizyon Olarak Güncelle</button>
             <button class="btn btn-secondary" onclick="loadDefaultTemplate()">🔄 Varsayılan Listeyi Yükle</button>
             <button class="btn btn-primary" onclick="savePriceList()">💾 Değişiklikleri Kaydet</button>
           </div>
@@ -559,18 +556,7 @@
               await dbClient.from('crm_price_history').insert(historyRows);
             }
 
-            // --- TEKLİF GÜNCELLEME VE TASLAK OLUŞTURMA MANTIĞI ---
-            const shouldUpdateOffers = document.getElementById('update_active_offers')?.checked;
-            let updatedCount = 0;
-            if (shouldUpdateOffers) {
-              updatedCount = await performBulkOffersUpdate();
-            }
-
-            let msg = 'Fiyat listesi veritabanına başarıyla kaydedildi.';
-            if (shouldUpdateOffers) {
-              msg += ` ${updatedCount} adet aktif/sözleşmeli firma için teklif revizyonu/taslağı oluşturuldu.`;
-            }
-            setStatus(msg, 'ok');
+            setStatus('Fiyat listesi veritabanına başarıyla kaydedildi.', 'ok');
             await loadPriceList();
           } catch (err) {
             console.error('Veritabanına kaydedilirken hata oluştu:', err);
@@ -739,6 +725,87 @@
         } catch (err) {
           console.error('Teklifler toplu güncellenirken hata oluştu:', err);
           return 0;
+        }
+      }
+
+      async function handleBulkOffersUpdateClick() {
+        setStatus('Revize edilecek teklifler hesaplanıyor, lütfen bekleyin...', 'info');
+        try {
+          // Durumu 'Kaybedildi' olmayan TÜM lead'leri (aktif, kazanıldı, sözleşmeli vs.) çekelim
+          const { data: leads, error: leadsErr } = await dbClient
+            .from('crm_leads')
+            .select('*')
+            .eq('tenant_id', currentAuth.tenant_id)
+            .neq('lead_status', 'Kaybedildi');
+
+          if (leadsErr) throw leadsErr;
+          if (!leads || !leads.length) {
+            setStatus('Sistemde revize edilecek aktif/kazanılmış firma bulunamadı.', 'err');
+            return;
+          }
+
+          const leadIds = leads.map(l => l.id);
+          
+          // Bu lead'lere ait tüm teklifleri çekelim
+          const { data: offers, error: offersErr } = await dbClient
+            .from('crm_offers')
+            .select('*')
+            .in('lead_id', leadIds);
+
+          if (offersErr) throw offersErr;
+
+          // Her lead için en yüksek version'lu son aktif teklifi bulalım
+          const latestOffersByLead = {};
+          if (offers && offers.length) {
+            offers.forEach(o => {
+              const leadId = o.lead_id;
+              const prev = latestOffersByLead[leadId];
+              if (!prev || o.version > prev.version) {
+                latestOffersByLead[leadId] = o;
+              }
+            });
+          }
+
+          let toUpdateCount = 0;
+          for (const lead of leads) {
+            const offer = latestOffersByLead[lead.id];
+            if (offer) {
+              const services = JSON.parse(JSON.stringify(offer.extra_services || []));
+              let hasChanges = false;
+              
+              services.forEach(s => {
+                const newPrice = getCustomPriceForBulk(s.name, lead.danger_class, offer.employee_count || lead.employee_count);
+                if (newPrice !== null && Number(s.unit_price) !== Number(newPrice)) {
+                  hasChanges = true;
+                }
+              });
+
+              if (hasChanges) {
+                toUpdateCount++;
+              }
+            } else {
+              // Teklifi yoksa dummy teklif eklenecek
+              toUpdateCount++;
+            }
+          }
+
+          setStatus('', ''); // Durumu temizle
+
+          if (toUpdateCount === 0) {
+            alert('Fiyatı güncellenecek herhangi bir aktif teklif bulunamadı.');
+            return;
+          }
+
+          const confirmed = confirm(`${toUpdateCount} sayıda teklif revizyonu oluşturulacaktır, bu işlem uzun sürebilir. Devam etmek istiyor musunuz?`);
+          if (!confirmed) return;
+
+          setStatus('Teklifler güncelleniyor, lütfen sayfayı kapatmayın...', 'info');
+          const updatedCount = await performBulkOffersUpdate();
+          setStatus(`Başarılı! ${updatedCount} adet aktif/sözleşmeli firma için teklif revizyonu/taslağı oluşturuldu.`, 'ok');
+
+        } catch (err) {
+          console.error('Teklifler güncellenirken hata oluştu:', err);
+          setStatus('Teklifler güncellenirken hata oluştu: ' + err.message, 'err');
         }
       }
 
