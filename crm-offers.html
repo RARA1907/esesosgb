@@ -594,10 +594,13 @@
 
         </div>
 
-        <div class="drawer-footer">
-          <button class="btn btn-secondary" onclick="closeDrawer()">Vazgeç</button>
-          <button class="btn btn-secondary" style="background:#e0f2fe; border-color:#bae6fd; color:#0369a1;" onclick="saveDrawerOffer(true)">🔄 Yeni Versiyon Oluştur (v+1)</button>
-          <button class="btn btn-primary" onclick="saveDrawerOffer(false)">💾 Değişiklikleri Güncelle</button>
+        <div class="drawer-footer" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+          <button class="btn btn-secondary" style="background:#f1f5f9; border-color:#cbd5e1; color:#334155; font-weight:700;" onclick="printDrawerOffer()">🖨️ PDF / Yazdır</button>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-secondary" onclick="closeDrawer()">Vazgeç</button>
+            <button class="btn btn-secondary" style="background:#e0f2fe; border-color:#bae6fd; color:#0369a1;" onclick="saveDrawerOffer(true)">🔄 Yeni Versiyon (v+1)</button>
+            <button class="btn btn-primary" onclick="saveDrawerOffer(false)">💾 Güncelle</button>
+          </div>
         </div>
 
       </div>
@@ -946,6 +949,10 @@
         const backdrop = document.getElementById('offer_drawer');
         backdrop.style.display = 'flex';
         setTimeout(() => backdrop.classList.add('active'), 10);
+      }
+
+      function printDrawerOffer() {
+        alert("PDF / Yazdır (özel antetli teklif formatı) modülü şu anda geliştirme aşamasındadır.");
       }
 
       function closeDrawer() {
