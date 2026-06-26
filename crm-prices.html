@@ -163,6 +163,15 @@
         <div class="nav-container"></div>
       </div>
 
+      <div class="crm-sub-nav">
+        <a href="crm.html" class="crm-sub-nav-btn">👥 Müşteri Yönetimi</a>
+        <a href="crm-prices.html" class="crm-sub-nav-btn crm-sub-active">💰 Fiyat Listesi</a>
+        <a href="crm-offers.html" class="crm-sub-nav-btn">📝 Teklif Yönetimi</a>
+        <a href="crm-contracts.html" class="crm-sub-nav-btn">📄 Sözleşme Yönetimi</a>
+        <a href="crm-transfer.html" class="crm-sub-nav-btn">🔄 Aktarım</a>
+        <a href="crm-reports.html" class="crm-sub-nav-btn">📈 CRM Raporları</a>
+      </div>
+
       <div class="price-page-shell">
         <div class="actions-bar">
           <div>
@@ -200,7 +209,7 @@
                 <label style="font-size:11px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:4px;">Toplu Zam Oranı (%)</label>
                 <input type="number" id="bulk_increase_percent" placeholder="Örn: 15" min="1" max="500" style="width:90px;" />
               </div>
-              <button class="btn btn-secondary" style="background:#fffbeb;border-color:#fde68a;color:#b45309;" onclick="applyBulkIncrease()">⚡ Fiyatları Zamla</button>
+              <button class="btn btn-secondary" style="background:#fffbeb;border-color:#fde68a;color:#b45309;" onclick="applyBulkIncrease()">⚡ Uygula</button>
             </div>
           </div>
           <div class="filter-group" style="justify-content:flex-end;">
@@ -575,36 +584,7 @@
       }
 
       // --- BULK TEKLİF REVİZYON VE TASLAK GÜNCELLEME FONKSİYONU ---
-      const normalizeText = (v) => (v || '')
-        .toString()
-        .toLocaleLowerCase('tr-TR')
-        .replaceAll('ı', 'i')
-        .replaceAll('ğ', 'g')
-        .replaceAll('ş', 's')
-        .replaceAll('ö', 'o')
-        .replaceAll('ü', 'u')
-        .replaceAll('ç', 'c')
-        .trim();
-
-      function getCustomPriceForBulk(serviceName, dangerClass, employeeCount) {
-        if (!serviceName) return null;
-        const emp = Number(employeeCount) || 1;
-        const dangerNorm = normalizeText(dangerClass);
-        const nameNorm = normalizeText(serviceName);
-
-        const matchedRule = priceRules.find(r => {
-          const min = Number(r.min_emp || 0);
-          const max = r.max_emp == null ? null : Number(r.max_emp);
-          const inRange = emp >= min && (max == null || emp <= max);
-          return normalizeText(r.danger_class) === dangerNorm && 
-                 normalizeText(r.service_name) === nameNorm && 
-                 inRange;
-        });
-
-        return matchedRule ? Number(matchedRule.price || 0) : null;
-      }
-
-      async function performBulkOffersUpdate() {
+      async function performBulkOffersUpdate(percent) {
         try {
           // Durumu 'Kaybedildi' olmayan TÜM lead'leri (aktif, kazanıldı, sözleşmeli vs.) çekelim
           const { data: leads, error: leadsErr } = await dbClient
@@ -645,15 +625,18 @@
           for (const lead of leads) {
             const offer = latestOffersByLead[lead.id];
             if (offer) {
-              // Mevcut teklifi kopyala ve kalem birim fiyatlarını güncelle
+              // Mevcut teklifi kopyala ve kalem birim fiyatlarına yüzde zam uygula
               const services = JSON.parse(JSON.stringify(offer.extra_services || []));
               let hasChanges = false;
               
               services.forEach(s => {
-                const newPrice = getCustomPriceForBulk(s.name, lead.danger_class, offer.employee_count || lead.employee_count);
-                if (newPrice !== null && Number(s.unit_price) !== Number(newPrice)) {
-                  s.unit_price = newPrice;
-                  hasChanges = true;
+                const oldPrice = Number(s.unit_price) || 0;
+                if (oldPrice > 0) {
+                  const newPrice = Math.ceil(oldPrice * (1 + percent / 100));
+                  if (newPrice !== oldPrice) {
+                    s.unit_price = newPrice;
+                    hasChanges = true;
+                  }
                 }
               });
 
@@ -665,11 +648,12 @@
                 const afterDisc = subtotal * (1 - disc / 100);
                 const total = afterDisc * (1 + kdvR / 100);
 
+                const nextVersion = offer.version + 1;
                 insertOffersPayloads.push({
                   tenant_id: currentAuth.tenant_id,
                   lead_id: lead.id,
                   offer_no: offer.offer_no,
-                  version: offer.version + 1,
+                  version: nextVersion,
                   offer_date: todayStr,
                   valid_until: offer.valid_until || futureStr,
                   employee_count: offer.employee_count,
@@ -680,7 +664,7 @@
                   subtotal: subtotal,
                   total_amount: total,
                   status: 'Revize',
-                  notes: (offer.notes ? offer.notes + '\n' : '') + '[Fiyat revizyon teklifi]\nYıl sonu fiyat güncellemesi otomatik uygulandı.',
+                  notes: (offer.notes ? offer.notes + '\n' : '') + `[V.${nextVersion} Fiyat revizyon teklifi]\n%${percent} oranında toplu zam otomatik uygulandı.`,
                   created_by: currentAuth.email
                 });
               }
@@ -710,7 +694,7 @@
                 subtotal: 0,
                 total_amount: 0,
                 status: 'Hazırlandı',
-                notes: '[Fiyat revizyon teklifi]\nOtomatik oluşturulmuş taslak teklif. Lütfen hizmet kalemlerini ekleyin.',
+                notes: '[V.1 Fiyat revizyon teklifi]\nOtomatik oluşturulmuş taslak teklif. Lütfen hizmet kalemlerini ekleyin.',
                 created_by: currentAuth.email
               });
             }
@@ -724,11 +708,26 @@
           return 0;
         } catch (err) {
           console.error('Teklifler toplu güncellenirken hata oluştu:', err);
-          return 0;
+          throw err;
         }
       }
 
       async function handleBulkOffersUpdateClick() {
+        // Öncelikle sayfadaki toplu zam oranı alanını kontrol et
+        const percentInput = document.getElementById('bulk_increase_percent');
+        let pct = parseFloat(percentInput?.value);
+        
+        if (isNaN(pct) || pct <= 0) {
+          // Eğer input boşsa prompt ile sor
+          const promptVal = prompt('Lütfen tekliflere uygulanacak toplu zam oranını (%) girin:');
+          if (promptVal === null) return; // İptal edildi
+          pct = parseFloat(promptVal);
+          if (isNaN(pct) || pct <= 0) {
+            alert('Lütfen geçerli bir zam oranı (%) girin!');
+            return;
+          }
+        }
+
         setStatus('Revize edilecek teklifler hesaplanıyor, lütfen bekleyin...', 'info');
         try {
           // Durumu 'Kaybedildi' olmayan TÜM lead'leri (aktif, kazanıldı, sözleşmeli vs.) çekelim
@@ -774,9 +773,12 @@
               let hasChanges = false;
               
               services.forEach(s => {
-                const newPrice = getCustomPriceForBulk(s.name, lead.danger_class, offer.employee_count || lead.employee_count);
-                if (newPrice !== null && Number(s.unit_price) !== Number(newPrice)) {
-                  hasChanges = true;
+                const oldPrice = Number(s.unit_price) || 0;
+                if (oldPrice > 0) {
+                  const newPrice = Math.ceil(oldPrice * (1 + pct / 100));
+                  if (newPrice !== oldPrice) {
+                    hasChanges = true;
+                  }
                 }
               });
 
@@ -796,12 +798,12 @@
             return;
           }
 
-          const confirmed = confirm(`${toUpdateCount} sayıda teklif revizyonu oluşturulacaktır, bu işlem uzun sürebilir. Devam etmek istiyor musunuz?`);
+          const confirmed = confirm(`%${pct} oranında toplu zam uygulanarak ${toUpdateCount} adet teklif revizyonu/taslağı oluşturulacaktır. Devam etmek istiyor musunuz?`);
           if (!confirmed) return;
 
           setStatus('Teklifler güncelleniyor, lütfen sayfayı kapatmayın...', 'info');
-          const updatedCount = await performBulkOffersUpdate();
-          setStatus(`Başarılı! ${updatedCount} adet aktif/sözleşmeli firma için teklif revizyonu/taslağı oluşturuldu.`, 'ok');
+          const updatedCount = await performBulkOffersUpdate(pct);
+          setStatus(`Başarılı! ${updatedCount} adet aktif/sözleşmeli firma için %${pct} zamlı teklif revizyonu/taslağı oluşturuldu.`, 'ok');
 
         } catch (err) {
           console.error('Teklifler güncellenirken hata oluştu:', err);

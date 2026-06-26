@@ -113,6 +113,15 @@
         <div class="nav-container"></div>
       </div>
 
+      <div class="crm-sub-nav">
+        <a href="crm.html" class="crm-sub-nav-btn">👥 Müşteri Yönetimi</a>
+        <a href="crm-prices.html" class="crm-sub-nav-btn">💰 Fiyat Listesi</a>
+        <a href="crm-offers.html" class="crm-sub-nav-btn crm-sub-active">📝 Teklif Yönetimi</a>
+        <a href="crm-contracts.html" class="crm-sub-nav-btn">📄 Sözleşme Yönetimi</a>
+        <a href="crm-transfer.html" class="crm-sub-nav-btn">🔄 Aktarım</a>
+        <a href="crm-reports.html" class="crm-sub-nav-btn">📈 CRM Raporları</a>
+      </div>
+
       <div class="crm-offer-page-shell">
 
         <!-- Breadcrumb -->
@@ -204,6 +213,14 @@
                 <button class="quick-pill" style="background:#fdf4ff;color:#7e22ce"   onclick="quickAdd('Acil Durum Planı Hazırlama',1,getCustomPrice('Acil Durum Planı Hazırlama'))">Acil Plan</button>
                 <button class="quick-pill" style="background:#ffe4e6;color:#9f1239"   onclick="quickAdd('Hastane Tarama',1,getCustomPrice('Hastane Tarama'))">Hastane Tarama</button>
                 <button class="quick-pill" style="background:#ecfccb;color:#365314"   onclick="quickAdd('Mobil Tarama',1,getCustomPrice('Mobil Tarama'))">Mobil Tarama</button>
+              </div>
+
+              <!-- Hizmet Şablonu Seçici -->
+              <div class="quick-select-container" style="margin-top:12px; display:flex; gap:8px; align-items:center; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid var(--border-color);">
+                <span class="pill-label" style="font-weight:700; font-size:12px; color:var(--text-color);">📋 Fiyat Listesi Şablonu:</span>
+                <select id="quick_service_select" onchange="handleQuickServiceSelect(this.value)" style="flex:1; max-width:300px; padding:6px 10px; font-size:12px; border-radius:6px; border:1px solid var(--border-color); outline:none; background:#fff;">
+                  <option value="">Hizmet seçip ekleyin...</option>
+                </select>
               </div>
             </div>
 
@@ -712,6 +729,45 @@
           const stored = localStorage.getItem('crm_price_list_v1');
           if (stored) priceRules = JSON.parse(stored);
         }
+
+        // Seçiciyi doldur
+        fillServiceSelect();
+      }
+
+      function fillServiceSelect() {
+        const select = document.getElementById('quick_service_select');
+        if (!select) return;
+        
+        const namesSet = new Set();
+        priceRules.forEach(r => { if (r.service_name) namesSet.add(r.service_name.trim()); });
+        defaultPriceRules.forEach(r => { if (r.service_name) namesSet.add(r.service_name.trim()); });
+        
+        const sortedNames = Array.from(namesSet).sort((a, b) => a.localeCompare(b, 'tr'));
+        
+        select.innerHTML = '<option value="">Hizmet seçip ekleyin...</option>';
+        sortedNames.forEach(name => {
+          const opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          select.appendChild(opt);
+        });
+      }
+
+      function handleQuickServiceSelect(serviceName) {
+        if (!serviceName) return;
+        const autoPrice = getCustomPrice(serviceName);
+        
+        // Eğer tablomuzda sadece bir tane dummy "Hizmet kalemi yok" kaydı varsa önce onu silelim
+        const rows = document.querySelectorAll('.service-row');
+        if (rows.length === 1) {
+          const firstInput = rows[0].querySelector('input[type=text]');
+          if (firstInput && firstInput.value.includes('Hizmet kalemi yok')) {
+            removeRow(0);
+          }
+        }
+
+        quickAdd(serviceName, 1, autoPrice);
+        document.getElementById('quick_service_select').value = "";
       }
 
       function updateRow(idx, field, value) {
