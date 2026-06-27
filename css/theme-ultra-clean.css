@@ -1,16 +1,52 @@
 /* Ultra-Clean Enterprise pilot theme for crm.html */
 
 :root {
-  --uc-bg: #f5f7fa;
+  --uc-bg: #F6F8FA;
   --uc-surface: #ffffff;
-  --uc-surface-muted: #f8fafc;
-  --uc-line: #dde5ee;
-  --uc-text: #132031;
-  --uc-text-muted: #566579;
-  --uc-primary: #0f6f75;
-  --uc-primary-soft: #e6f4f5;
-  --uc-focus: #0e7490;
+  --uc-surface-muted: #F6F8FA;
+  --uc-line: #E2E8F0;
+  --uc-text: #0F1D2E;
+  --uc-text-muted: #64748b;
+  --uc-primary: #0E7C86; /* Default Teal */
+  --uc-primary-soft: #eef7f8;
+  --uc-focus: #0E7C86;
 }
+
+body.theme-palette-blue {
+  --primary: #2563EB;
+  --uc-primary: #2563EB;
+  --uc-primary-soft: #DBEAFE;
+  --uc-focus: #1D4ED8;
+}
+
+body.theme-palette-emerald {
+  --primary: #059669;
+  --uc-primary: #059669;
+  --uc-primary-soft: #D1FAE5;
+  --uc-focus: #047857;
+}
+
+body.theme-palette-purple {
+  --primary: #7C3AED;
+  --uc-primary: #7C3AED;
+  --uc-primary-soft: #EDE9FE;
+  --uc-focus: #6D28D9;
+}
+
+body.theme-palette-rose {
+  --primary: #E11D48;
+  --uc-primary: #E11D48;
+  --uc-primary-soft: #FFE4E6;
+  --uc-focus: #BE123C;
+}
+
+body.theme-palette-slate {
+  --primary: #475569;
+  --uc-primary: #475569;
+  --uc-primary-soft: #F1F5F9;
+  --uc-focus: #334155;
+}
+
 
 body.theme-ultra-clean {
   margin: 0;

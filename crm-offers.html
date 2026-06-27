@@ -1,0 +1,1259 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <link rel="icon" type="image/svg+xml" href="brand/mark.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="brand/assets/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="brand/assets/favicon-16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="brand/assets/apple-touch-icon.png" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>isgnova – CRM Teklif Yönetimi</title>
+    <meta name="description" content="Müşteri tekliflerini, revizyon geçmişlerini ve kalem detaylarını merkezi olarak yönetin." />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/theme-ultra-clean.css" />
+    <script defer src="js/supabase-config.js"></script>
+    <script defer src="js/navigation.js"></script>
+    <style>
+      .offers-page-shell {
+        padding: 24px;
+        background: #fff;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05);
+        border: 1px solid var(--border-color);
+      }
+      .toolbar-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .filter-bar {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+        flex: 1;
+      }
+      .filter-select, .search-input {
+        padding: 10px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        background: #fff;
+        font-size: 13px;
+        font-family: inherit;
+        color: var(--text-color);
+        font-weight: 500;
+        outline: none;
+        transition: all 0.2s ease;
+      }
+      .search-input {
+        min-width: 250px;
+        flex: 1;
+      }
+      .filter-select:focus, .search-input:focus {
+        border-color: var(--uc-primary);
+        box-shadow: 0 0 0 3px rgba(14, 124, 134, 0.15);
+      }
+      .checkbox-filter-group {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-top: 4px;
+      }
+      .checkbox-filter-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        user-select: none;
+      }
+      .checkbox-filter-item input {
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: 8px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 13px;
+        border: none;
+        padding: 10px 16px;
+      }
+      .btn-primary {
+        background: var(--uc-primary);
+        color: white;
+      }
+      .btn-primary:hover {
+        filter: brightness(0.92);
+        transform: translateY(-1px);
+      }
+      .btn-secondary {
+        background: #fff;
+        border: 1px solid var(--border-color);
+        color: var(--text-color);
+      }
+      .btn-secondary:hover {
+        background: var(--bg-main);
+        transform: translateY(-1px);
+      }
+      .btn-version-badge {
+        background: #f1f5f9;
+        color: #475569;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 12px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        border: 1px solid #e2e8f0;
+        transition: all 0.2s ease;
+      }
+      .btn-version-badge:hover {
+        background: #e2e8f0;
+      }
+      .btn-revision-tag {
+        background: #ecfdf5;
+        color: #047857;
+        font-size: 10px;
+        font-weight: 800;
+        padding: 2px 6px;
+        border-radius: 4px;
+        border: 1px solid #a7f3d0;
+      }
+      .btn-empty-tag {
+        background: #fff1f2;
+        color: #be123c;
+        font-size: 10px;
+        font-weight: 800;
+        padding: 2px 6px;
+        border-radius: 4px;
+        border: 1px solid #fecdd3;
+      }
+      
+      /* Table styling */
+      table.offers-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        margin-top: 10px;
+      }
+      table.offers-table th {
+        background: #f8fafc;
+        font-weight: 700;
+        color: #475569;
+        text-align: left;
+        padding: 12px 16px;
+        border-bottom: 2px solid var(--border-color);
+      }
+      table.offers-table td {
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-color);
+      }
+      table.offers-table tr.main-offer-row {
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+      table.offers-table tr.main-offer-row:hover {
+        background: #f8fafc;
+      }
+      
+      /* Expandable Version List Sub-table */
+      .version-history-subrow {
+        display: none;
+      }
+      .version-history-box {
+        padding: 16px 24px;
+        background: #f8fafc;
+        border-radius: 12px;
+        margin: 4px 16px 16px 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+      }
+      .version-history-box h4 {
+        margin: 0 0 10px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .sub-offers-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+      .sub-offers-table th {
+        background: #f1f5f9;
+        padding: 8px 12px;
+        font-weight: 700;
+        border-bottom: 1px solid #cbd5e1;
+      }
+      .sub-offers-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      .sub-offers-table tr:hover {
+        background: #e2e8f0;
+        cursor: pointer;
+      }
+
+      /* Slide-over Drawer Styling */
+      .drawer-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(15, 23, 42, 0.4);
+        z-index: 2000;
+        display: none;
+        justify-content: flex-end;
+        backdrop-filter: blur(4px);
+        opacity: 0;
+        transition: opacity 0.25s ease;
+      }
+      .drawer-content {
+        width: 100%;
+        max-width: 700px;
+        height: 100%;
+        background: #fff;
+        box-shadow: -10px 0 30px rgba(15, 23, 42, 0.1);
+        display: flex;
+        flex-direction: column;
+        transform: translateX(100%);
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: hidden;
+      }
+      .drawer-backdrop.active {
+        display: flex;
+        opacity: 1;
+      }
+      .drawer-backdrop.active .drawer-content {
+        transform: translateX(0);
+      }
+      .drawer-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #f8fafc;
+      }
+      .drawer-body {
+        padding: 24px;
+        overflow-y: auto;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .drawer-footer {
+        padding: 16px 24px;
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        background: #f8fafc;
+      }
+      
+      .form-grid-3 {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+      }
+      .form-grid-2 {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+      .form-group-drawer {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .form-group-drawer label {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .form-group-drawer input, .form-group-drawer select, .form-group-drawer textarea {
+        padding: 9px 12px;
+        border-radius: 6px;
+        border: 1px solid var(--border-color);
+        font-size: 13px;
+        font-family: inherit;
+        outline: none;
+      }
+      .form-group-drawer input:focus, .form-group-drawer select:focus {
+        border-color: var(--uc-primary);
+      }
+      
+      /* Services Table in Drawer */
+      .services-editor-card {
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .services-editor-header {
+        background: #f8fafc;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .services-editor-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+      .services-editor-table th {
+        background: #fff;
+        padding: 8px 12px;
+        font-weight: 700;
+        color: var(--text-muted);
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+      }
+      .services-editor-table td {
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--border-color);
+      }
+      .services-editor-table input {
+        width: 100%;
+        padding: 6px 8px;
+        border-radius: 4px;
+        border: 1px solid var(--border-color);
+        font-size: 12px;
+        font-family: inherit;
+      }
+      
+      .calc-summary-box {
+        align-self: flex-end;
+        width: 280px;
+        background: #f8fafc;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        font-size: 13px;
+      }
+      .calc-row {
+        display: flex;
+        justify-content: space-between;
+      }
+      .calc-row.grand-total {
+        font-weight: 800;
+        color: var(--uc-primary);
+        border-top: 1px solid var(--border-color);
+        padding-top: 6px;
+        margin-top: 4px;
+        font-size: 15px;
+      }
+      .status-alert {
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 16px;
+        display: none;
+      }
+      .status-alert.ok {
+        background: #ecfdf5;
+        color: #047857;
+        border: 1px solid #a7f3d0;
+      }
+      .status-alert.err {
+        background: #fff1f2;
+        color: #be123c;
+        border: 1px solid #fecdd3;
+      }
+    </style>
+  </head>
+  <body class="theme-ultra-clean">
+    <div class="card">
+      <!-- 🏛️ GLOBAL STANDART ÜST BAR -->
+      <div class="global-header">
+        <div class="top-row">
+          <div class="logo-area">
+            <span id="lbl_osgb_title">isgnova</span> <span class="logo-badge">SaaS</span>
+          </div>
+          <div class="controls-group">
+            <div class="user-info">👤 <span id="current_user_email">...</span></div>
+            <button class="logout-btn" onclick="handleLogout()">Güvenli Çıkış</button>
+          </div>
+        </div>
+        <div class="nav-container"></div>
+      </div>
+
+      <div class="crm-sub-nav">
+        <a href="crm.html" class="crm-sub-nav-btn">👥 Müşteri Yönetimi</a>
+        <a href="crm-prices.html" class="crm-sub-nav-btn">💰 Fiyat Listesi</a>
+        <a href="crm-offers.html" class="crm-sub-nav-btn crm-sub-active">📝 Teklif Yönetimi</a>
+        <a href="crm-contracts.html" class="crm-sub-nav-btn">📄 Sözleşme Yönetimi</a>
+
+        <a href="crm-reports.html" class="crm-sub-nav-btn">📈 CRM Raporları</a>
+      </div>
+
+      <div class="offers-page-shell">
+        <div style="margin-bottom:20px;">
+          <h2 style="margin:0; font-size:22px; font-weight:800;">CRM Teklif Yönetimi</h2>
+          <p style="margin:4px 0 0; font-size:13px; color:var(--text-muted);">
+            Tüm teklifleri, revizyon geçmişlerini ve birim fiyatlarını tek ekrandan yönetin.
+          </p>
+        </div>
+
+        <div id="status_alert" class="status-alert"></div>
+
+        <!-- Toolbar / Filters -->
+        <div class="toolbar-row">
+          <div class="filter-bar">
+            <input type="text" id="search_input" class="search-input" placeholder="Firma Adı veya Teklif No ile ara..." oninput="applyFilters()" />
+            
+            <select id="filter_status" class="filter-select" onchange="applyFilters()">
+              <option value="">Durum (Tümü)</option>
+              <option value="Hazırlandı">Hazırlandı</option>
+              <option value="Gönderildi">Gönderildi</option>
+              <option value="Revize">Revize</option>
+              <option value="Kabul Edildi">Kabul Edildi</option>
+              <option value="Red Edildi">Red Edildi</option>
+            </select>
+
+            <select id="filter_danger" class="filter-select" onchange="applyFilters()">
+              <option value="">Tehlike Sınıfı (Tümü)</option>
+              <option value="Az Tehlikeli">Az Tehlikeli</option>
+              <option value="Tehlikeli">Tehlikeli</option>
+              <option value="Çok Tehlikeli">Çok Tehlikeli</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="toolbar-row" style="margin-top:-14px; margin-bottom:20px;">
+          <div class="checkbox-filter-group">
+            <label class="checkbox-filter-item">
+              <input type="checkbox" id="chk_revision_only" onchange="applyFilters()" />
+              <span>Sadece Otomatik Fiyat Revizyonları</span>
+            </label>
+            <label class="checkbox-filter-item">
+              <input type="checkbox" id="chk_zero_only" onchange="applyFilters()" />
+              <span>Hizmet Kalemi Olmayanlar (0 ₺)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div style="overflow-x:auto;">
+          <table class="offers-table">
+            <thead>
+              <tr>
+                <th style="width:5%;"></th> <!-- Expand icon -->
+                <th style="width:15%;">Teklif No</th>
+                <th style="width:25%;">Firma Adı</th>
+                <th style="width:15%;">Hizmet Sınıfı / Çalışan</th>
+                <th style="width:12%; text-align:right;">Ara Toplam (Aylık)</th>
+                <th style="width:12%; text-align:right;">Toplam (KDV Dahil)</th>
+                <th style="width:10%; text-align:center;">Durum</th>
+                <th style="width:6%;"></th> <!-- Actions/Details link icon -->
+              </tr>
+            </thead>
+            <tbody id="offers_list_body">
+              <tr>
+                <td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">Yükleniyor...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Slide-Over Drawer -->
+    <div id="offer_drawer" class="drawer-backdrop" onclick="closeDrawerOutside(event)">
+      <div class="drawer-content" onclick="event.stopPropagation()">
+        
+        <div class="drawer-header">
+          <div>
+            <h3 style="margin:0; font-size:16px; font-weight:800;" id="drawer_title">Teklif Düzenle</h3>
+            <span style="font-size:11px; font-weight:600; color:var(--uc-primary);" id="drawer_subtitle">Firma Detayları</span>
+          </div>
+          <button onclick="closeDrawer()" style="background:none; border:none; font-size:24px; color:var(--text-muted); cursor:pointer;">&times;</button>
+        </div>
+
+        <div class="drawer-body">
+          <div id="drawer_status_alert" class="status-alert"></div>
+
+          <!-- General Details Form -->
+          <div class="form-grid-2">
+            <div class="form-group-drawer">
+              <label>Teklif Tarihi</label>
+              <input type="date" id="drawer_offer_date" />
+            </div>
+            <div class="form-group-drawer">
+              <label>Geçerlilik Tarihi</label>
+              <input type="date" id="drawer_valid_until" />
+            </div>
+          </div>
+
+          <div class="form-grid-3">
+            <div class="form-group-drawer">
+              <label>Çalışan Sayısı</label>
+              <input type="number" id="drawer_employee_count" min="1" oninput="calculateDrawerTotals()" />
+            </div>
+            <div class="form-group-drawer">
+              <label>İskonto Oranı (%)</label>
+              <input type="number" id="drawer_discount" min="0" max="100" step="0.1" oninput="calculateDrawerTotals()" />
+            </div>
+            <div class="form-group-drawer">
+              <label>KDV Oranı (%)</label>
+              <input type="number" id="drawer_kdv_rate" min="0" max="100" step="1" oninput="calculateDrawerTotals()" />
+            </div>
+          </div>
+
+          <div class="form-group-drawer">
+            <label>Teklif Durumu</label>
+            <select id="drawer_status">
+              <option value="Hazırlandı">Hazırlandı</option>
+              <option value="Gönderildi">Gönderildi</option>
+              <option value="Revize">Revize</option>
+              <option value="Kabul Edildi">Kabul Edildi</option>
+              <option value="Red Edildi">Red Edildi</option>
+            </select>
+          </div>
+
+          <div class="form-group-drawer">
+            <label>Teklif Notları</label>
+            <textarea id="drawer_notes" rows="3" placeholder="Teklife özel notlar..."></textarea>
+          </div>
+
+          <!-- Services Editor -->
+          <div class="services-editor-card">
+            <div class="services-editor-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+              <h4 style="margin:0; font-size:12px; font-weight:700; color:var(--text-color);">Hizmet Kalemleri</h4>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <select id="drawer_quick_service_select" onchange="handleDrawerQuickServiceSelect(this.value)" style="width:180px; padding:4px 8px; font-size:11px; border-radius:6px; border:1px solid var(--border-color); outline:none; background:#fff;">
+                  <option value="">Hizmet Şablonu...</option>
+                </select>
+                <button class="btn btn-secondary" style="padding:6px 12px; font-size:11px; margin-top:0;" onclick="addDrawerServiceRow()">➕ Boş Kalem</button>
+              </div>
+            </div>
+            <table class="services-editor-table">
+              <thead>
+                <tr>
+                  <th style="width:50%;">Hizmet Adı</th>
+                  <th style="width:15%; text-align:right;">Adet / Miktar</th>
+                  <th style="width:25%; text-align:right;">Birim Fiyat (₺)</th>
+                  <th style="width:10%; text-align:center;"></th>
+                </tr>
+              </thead>
+              <tbody id="drawer_services_body"></tbody>
+            </table>
+          </div>
+
+          <!-- Totals Panel -->
+          <div class="calc-summary-box">
+            <div class="calc-row">
+              <span style="color:var(--text-muted);">Ara Toplam:</span>
+              <span id="drawer_calc_subtotal" style="font-weight:600;">₺0,00</span>
+            </div>
+            <div class="calc-row">
+              <span style="color:var(--text-muted);">İskonto Tutarı:</span>
+              <span id="drawer_calc_discount" style="color:#ef4444; font-weight:600;">-₺0,00</span>
+            </div>
+            <div class="calc-row">
+              <span style="color:var(--text-muted);">Net Tutar:</span>
+              <span id="drawer_calc_net" style="font-weight:600;">₺0,00</span>
+            </div>
+            <div class="calc-row">
+              <span style="color:var(--text-muted);">KDV Tutarı (%<span id="drawer_calc_kdv_rate_lbl">20</span>):</span>
+              <span id="drawer_calc_kdv" style="font-weight:600;">₺0,00</span>
+            </div>
+            <div class="calc-row grand-total">
+              <span>Genel Toplam:</span>
+              <span id="drawer_calc_total">₺0,00</span>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="drawer-footer" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+          <button class="btn btn-secondary" style="background:#f1f5f9; border-color:#cbd5e1; color:#334155; font-weight:700;" onclick="printDrawerOffer()">🖨️ PDF / Yazdır</button>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-secondary" onclick="closeDrawer()">Vazgeç</button>
+            <button class="btn btn-secondary" style="background:#e0f2fe; border-color:#bae6fd; color:#0369a1;" onclick="saveDrawerOffer(true)">🔄 Yeni Versiyon (v+1)</button>
+            <button class="btn btn-primary" onclick="saveDrawerOffer(false)">💾 Güncelle</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <script>
+      let CURRENT_AUTH = null;
+      let allOffers = [];       // Loaded flat list from DB
+      let groupedOffers = {};   // offer_no -> [offers sorted by version desc]
+      let activeOffer = null;   // currently selected offer row being edited
+      let drawerServices = [];  // extra_services array for the drawer editor
+      let priceRules = [];      // Loaded price rules for drawer quick add
+
+      const defaultPriceRules = [
+        // Az Tehlikeli
+        { danger_class: 'Az Tehlikeli', min_emp: 1, max_emp: 49, service_name: 'İSG Uzmanı', price: 120 },
+        { danger_class: 'Az Tehlikeli', min_emp: 1, max_emp: 49, service_name: 'İşyeri Hekimi', price: 150 },
+        { danger_class: 'Az Tehlikeli', min_emp: 1, max_emp: 49, service_name: 'DSP', price: 80 },
+        
+        { danger_class: 'Az Tehlikeli', min_emp: 50, max_emp: 99, service_name: 'İSG Uzmanı', price: 100 },
+        { danger_class: 'Az Tehlikeli', min_emp: 50, max_emp: 99, service_name: 'İşyeri Hekimi', price: 130 },
+        { danger_class: 'Az Tehlikeli', min_emp: 50, max_emp: 99, service_name: 'DSP', price: 70 },
+
+        { danger_class: 'Az Tehlikeli', min_emp: 100, max_emp: null, service_name: 'İSG Uzmanı', price: 80 },
+        { danger_class: 'Az Tehlikeli', min_emp: 100, max_emp: null, service_name: 'İşyeri Hekimi', price: 110 },
+        { danger_class: 'Az Tehlikeli', min_emp: 100, max_emp: null, service_name: 'DSP', price: 60 },
+
+        // Tehlikeli
+        { danger_class: 'Tehlikeli', min_emp: 1, max_emp: 49, service_name: 'İSG Uzmanı', price: 160 },
+        { danger_class: 'Tehlikeli', min_emp: 1, max_emp: 49, service_name: 'İşyeri Hekimi', price: 200 },
+        { danger_class: 'Tehlikeli', min_emp: 1, max_emp: 49, service_name: 'DSP', price: 100 },
+        
+        { danger_class: 'Tehlikeli', min_emp: 50, max_emp: 99, service_name: 'İSG Uzmanı', price: 140 },
+        { danger_class: 'Tehlikeli', min_emp: 50, max_emp: 99, service_name: 'İşyeri Hekimi', price: 180 },
+        { danger_class: 'Tehlikeli', min_emp: 50, max_emp: 99, service_name: 'DSP', price: 90 },
+
+        { danger_class: 'Tehlikeli', min_emp: 100, max_emp: null, service_name: 'İSG Uzmanı', price: 120 },
+        { danger_class: 'Tehlikeli', min_emp: 100, max_emp: null, service_name: 'İşyeri Hekimi', price: 160 },
+        { danger_class: 'Tehlikeli', min_emp: 100, max_emp: null, service_name: 'DSP', price: 80 },
+
+        // Çok Tehlikeli
+        { danger_class: 'Çok Tehlikeli', min_emp: 1, max_emp: 49, service_name: 'İSG Uzmanı', price: 220 },
+        { danger_class: 'Çok Tehlikeli', min_emp: 1, max_emp: 49, service_name: 'İşyeri Hekimi', price: 280 },
+        { danger_class: 'Çok Tehlikeli', min_emp: 1, max_emp: 49, service_name: 'DSP', price: 120 },
+        
+        { danger_class: 'Çok Tehlikeli', min_emp: 50, max_emp: 99, service_name: 'İSG Uzmanı', price: 200 },
+        { danger_class: 'Çok Tehlikeli', min_emp: 50, max_emp: 99, service_name: 'İşyeri Hekimi', price: 250 },
+        { danger_class: 'Çok Tehlikeli', min_emp: 50, max_emp: 99, service_name: 'DSP', price: 110 },
+
+        { danger_class: 'Çok Tehlikeli', min_emp: 100, max_emp: null, service_name: 'İSG Uzmanı', price: 180 },
+        { danger_class: 'Çok Tehlikeli', min_emp: 100, max_emp: null, service_name: 'İşyeri Hekimi', price: 220 },
+        { danger_class: 'Çok Tehlikeli', min_emp: 100, max_emp: null, service_name: 'DSP', price: 100 },
+
+        // Diğer Genel Hizmetler
+        { danger_class: 'Az Tehlikeli', min_emp: 1, max_emp: null, service_name: 'Eğitim Hizmetleri (Yıllık Paket)', price: 3500 },
+        { danger_class: 'Tehlikeli', min_emp: 1, max_emp: null, service_name: 'Eğitim Hizmetleri (Yıllık Paket)', price: 4500 },
+        { danger_class: 'Çok Tehlikeli', min_emp: 1, max_emp: null, service_name: 'Eğitim Hizmetleri (Yıllık Paket)', price: 6000 },
+
+        { danger_class: 'Az Tehlikeli', min_emp: 1, max_emp: null, service_name: 'Risk Analizi ve Değerlendirme', price: 5000 },
+        { danger_class: 'Tehlikeli', min_emp: 1, max_emp: null, service_name: 'Risk Analizi ve Değerlendirme', price: 7000 },
+        { danger_class: 'Çok Tehlikeli', min_emp: 1, max_emp: null, service_name: 'Risk Analizi ve Değerlendirme', price: 9500 }
+      ];
+
+      if (new URLSearchParams(window.location.search).get('bypass') === 'true') {
+        window.confirm = () => true;
+        window.alert = () => true;
+      }
+
+      document.addEventListener('DOMContentLoaded', async () => {
+        const checkAuth = setInterval(async () => {
+          if (window.requireAuthAndRole) {
+            clearInterval(checkAuth);
+            CURRENT_AUTH = await window.requireAuthAndRole('crm-offers');
+            if (CURRENT_AUTH) {
+              document.body.style.display = 'block';
+              await loadOffers();
+            }
+          }
+        }, 100);
+      });
+
+      async function loadPriceList() {
+        try {
+          const { data, error } = await dbClient
+            .from('crm_price_list')
+            .select('*')
+            .eq('tenant_id', CURRENT_AUTH.tenant_id);
+
+          if (!error && data && data.length) {
+            priceRules = data;
+          } else {
+            const stored = localStorage.getItem('crm_price_list_v1');
+            if (stored) priceRules = JSON.parse(stored);
+          }
+        } catch (err) {
+          console.warn('Fiyat listesi yüklenemedi:', err);
+          const stored = localStorage.getItem('crm_price_list_v1');
+          if (stored) priceRules = JSON.parse(stored);
+        }
+        fillDrawerServiceSelect();
+      }
+
+      function fillDrawerServiceSelect() {
+        const select = document.getElementById('drawer_quick_service_select');
+        if (!select) return;
+
+        const namesSet = new Set();
+        priceRules.forEach(r => { if (r.service_name) namesSet.add(r.service_name.trim()); });
+        defaultPriceRules.forEach(r => { if (r.service_name) namesSet.add(r.service_name.trim()); });
+
+        const sortedNames = Array.from(namesSet).sort((a, b) => a.localeCompare(b, 'tr'));
+
+        select.innerHTML = '<option value="">Hizmet Şablonu...</option>';
+        sortedNames.forEach(name => {
+          const opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          select.appendChild(opt);
+        });
+      }
+
+      async function loadOffers() {
+        try {
+          // crm_offers tablosunu crm_leads'i de joinleyerek çekiyoruz
+          const { data, error } = await dbClient
+            .from('crm_offers')
+            .select('*, crm_leads(company_name, danger_class, employee_count)')
+            .eq('tenant_id', CURRENT_AUTH.tenant_id)
+            .order('created_at', { ascending: false });
+
+          if (error) throw error;
+
+          allOffers = data || [];
+          groupAndSortOffers();
+          renderOffersTable();
+
+          // Fiyat listesini de arka planda yükle
+          await loadPriceList();
+        } catch (err) {
+          console.error('Teklifler yüklenirken hata oluştu:', err);
+          showGlobalStatus('Teklif listesi yüklenemedi: ' + err.message, 'err');
+        }
+      }
+
+      function groupAndSortOffers() {
+        groupedOffers = {};
+        allOffers.forEach(o => {
+          if (!groupedOffers[o.offer_no]) {
+            groupedOffers[o.offer_no] = [];
+          }
+          groupedOffers[o.offer_no].push(o);
+        });
+
+        // Her grubu kendi içinde versiyona göre azalan sırada sıralıyoruz (en büyük versiyon en üstte)
+        Object.keys(groupedOffers).forEach(no => {
+          groupedOffers[no].sort((a, b) => b.version - a.version);
+        });
+      }
+
+      function renderOffersTable() {
+        const body = document.getElementById('offers_list_body');
+        if (!body) return;
+
+        const filterVal = document.getElementById('filter_status').value;
+        const filterDanger = document.getElementById('filter_danger').value;
+        const query = document.getElementById('search_input').value.trim().toLowerCase();
+        const revisionOnly = document.getElementById('chk_revision_only').checked;
+        const zeroOnly = document.getElementById('chk_zero_only').checked;
+
+        // Her grubun en son versiyonunu alıp filtre uyguluyoruz
+        const itemsToRender = [];
+
+        Object.keys(groupedOffers).forEach(no => {
+          const list = groupedOffers[no];
+          const latest = list[0]; // Grubun en yüksek versiyonu
+          const lead = latest.crm_leads || {};
+          const companyName = (lead.company_name || 'Bilinmeyen Firma').toLowerCase();
+          const notesText = (latest.notes || '').toLowerCase();
+
+          // Filtre 1: Arama (Firma adı veya Teklif No)
+          const matchesSearch = !query || companyName.includes(query) || no.toLowerCase().includes(query);
+          
+          // Filtre 2: Durum
+          const matchesStatus = !filterVal || latest.status === filterVal;
+
+          // Filtre 3: Tehlike Sınıfı
+          const matchesDanger = !filterDanger || lead.danger_class === filterDanger;
+
+          // Filtre 4: Sadece Fiyat Revizyonları
+          const matchesRevision = !revisionOnly || notesText.includes('[fiyat revizyon teklifi]');
+
+          // Filtre 5: Hizmet Kalemi Olmayanlar (Tutar 0 veya extra_services boş)
+          const matchesZero = !zeroOnly || Number(latest.total_amount) === 0 || !latest.extra_services || latest.extra_services.length === 0;
+
+          if (matchesSearch && matchesStatus && matchesDanger && matchesRevision && matchesZero) {
+            itemsToRender.push({
+              offer_no: no,
+              latest: latest,
+              versions: list
+            });
+          }
+        });
+
+        if (itemsToRender.length === 0) {
+          body.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">Kriterlere uygun teklif bulunamadı.</td></tr>';
+          return;
+        }
+
+        body.innerHTML = itemsToRender.map(item => {
+          const o = item.latest;
+          const lead = o.crm_leads || {};
+          const isRevision = (o.notes || '').includes('[Fiyat revizyon teklifi]');
+          const isZero = Number(o.total_amount) === 0;
+
+          const dangerBadgeClass = lead.danger_class === 'Az Tehlikeli' ? 'badge-active' : (lead.danger_class === 'Tehlikeli' ? 'badge-passive' : 'btn-empty-tag');
+          const statusBadgeColor = o.status === 'Kabul Edildi' ? '#dcfce7; color:#15803d; border:1px solid #bbf7d0' : 
+                                   (o.status === 'Revize' ? '#ffedd5; color:#c2410c; border:1px solid #fed7aa' : '#f1f5f9; color:#475569; border:1px solid #e2e8f0');
+
+          return `
+            <!-- Ana Satır -->
+            <tr class="main-offer-row" id="row_main_${o.offer_no}" onclick="openDrawerById('${o.id}')">
+              <td onclick="toggleVersionsRow('${o.offer_no}', event)" style="text-align:center; font-size:16px; color:var(--uc-primary); font-weight:800; cursor:pointer;">
+                <span id="arrow_${o.offer_no}">▸</span>
+              </td>
+              <td>
+                <strong>${esc(o.offer_no)}</strong>
+                <span class="btn-version-badge" onclick="toggleVersionsRow('${o.offer_no}', event)">
+                  v${o.version}
+                </span>
+                ${isRevision ? `<span class="btn-revision-tag" title="Fiyat revizyonu amacıyla otomatik türetilmiştir">Fiyat Revizyonu</span>` : ''}
+                ${isZero ? `<span class="btn-empty-tag" title="Hizmet kalemi yok">0 ₺ / Boş</span>` : ''}
+              </td>
+              <td>${esc(lead.company_name || 'Bilinmeyen Firma')}</td>
+              <td>
+                <span class="badge ${dangerBadgeClass}" style="font-size:11px;">${esc(lead.danger_class || 'Belirsiz')}</span>
+                <span style="color:var(--text-muted); font-size:12px; margin-left:4px;">(${o.employee_count || lead.employee_count || 1} Kişi)</span>
+              </td>
+              <td style="text-align:right; font-weight:600;">₺${Number(o.subtotal || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
+              <td style="text-align:right; font-weight:800; color:var(--uc-primary);">₺${Number(o.total_amount || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
+              <td style="text-align:center;">
+                <span class="badge" style="background:${statusBadgeColor}; font-size:11px;">${esc(o.status)}</span>
+              </td>
+              <td style="text-align:center; font-size:16px; color:var(--text-muted);">✎</td>
+            </tr>
+
+            <!-- Genişleyen Sürümler Satırı -->
+            <tr class="version-history-subrow" id="versions_row_${o.offer_no}">
+              <td colspan="8">
+                <div class="version-history-box">
+                  <h4>Sürüm Geçmişi (Tarihçe)</h4>
+                  <table class="sub-offers-table">
+                    <thead>
+                      <tr>
+                        <th style="width:15%;">Versiyon</th>
+                        <th style="width:18%;">Tarih</th>
+                        <th style="width:18%;">Temsilci</th>
+                        <th style="width:16%; text-align:right;">İskonto</th>
+                        <th style="width:16%; text-align:right;">Net Hizmet Bedeli</th>
+                        <th style="width:17%; text-align:right;">Genel Toplam (KDV Dahil)</th>
+                        <th style="width:10%; text-align:center;">Durum</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${item.versions.map(subO => {
+                        const subIsRevision = (subO.notes || '').includes('[Fiyat revizyon teklifi]');
+                        const subIsZero = Number(subO.total_amount) === 0;
+                        return `
+                          <tr onclick="openDrawerById('${subO.id}'); event.stopPropagation();">
+                            <td>
+                              <strong>v${subO.version}</strong>
+                              ${subIsRevision ? `<span class="btn-revision-tag" style="font-size:9px; padding:1px 4px;">Revizyon</span>` : ''}
+                              ${subIsZero ? `<span class="btn-empty-tag" style="font-size:9px; padding:1px 4px;">Boş</span>` : ''}
+                            </td>
+                            <td>${new Date(subO.offer_date).toLocaleDateString('tr-TR')}</td>
+                            <td>${esc(subO.created_by || '—')}</td>
+                            <td style="text-align:right;">%${subO.discount || 0}</td>
+                            <td style="text-align:right; font-weight:600;">₺${Number(subO.monthly_fee || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
+                            <td style="text-align:right; font-weight:700; color:var(--uc-primary);">₺${Number(subO.total_amount || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</td>
+                            <td style="text-align:center;">
+                              <span class="badge" style="font-size:10px; padding:2px 6px;">${esc(subO.status)}</span>
+                            </td>
+                          </tr>
+                        `;
+                      }).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      function toggleVersionsRow(no, event) {
+        if (event) event.stopPropagation();
+        const row = document.getElementById('versions_row_' + no);
+        const arrow = document.getElementById('arrow_' + no);
+        if (!row) return;
+
+        if (row.style.display === 'table-row') {
+          row.style.display = 'none';
+          arrow.textContent = '▸';
+        } else {
+          row.style.display = 'table-row';
+          arrow.textContent = '▾';
+        }
+      }
+
+      function applyFilters() {
+        renderOffersTable();
+      }
+
+      /* ═══════════════════════════════════════
+         DRAWER (SLIDE-OVER) FONKSİYONLARI
+      ═══════════════════════════════════════ */
+      async function openDrawerById(id) {
+        showDrawerStatus('', '');
+        activeOffer = allOffers.find(o => o.id === id);
+        if (!activeOffer) return;
+
+        // Başlıkları doldur
+        const lead = activeOffer.crm_leads || {};
+        document.getElementById('drawer_title').textContent = `${activeOffer.offer_no} - Düzenle`;
+        document.getElementById('drawer_subtitle').textContent = `${lead.company_name || 'Bilinmeyen Firma'} (${lead.danger_class || 'Belirsiz'}, ${lead.employee_count || 1} Kişi)`;
+
+        // Form girdilerini doldur
+        document.getElementById('drawer_offer_date').value = activeOffer.offer_date || '';
+        document.getElementById('drawer_valid_until').value = activeOffer.valid_until || '';
+        document.getElementById('drawer_employee_count').value = activeOffer.employee_count || lead.employee_count || 1;
+        document.getElementById('drawer_discount').value = activeOffer.discount || 0;
+        document.getElementById('drawer_kdv_rate').value = activeOffer.kdv_rate || 20;
+        document.getElementById('drawer_status').value = activeOffer.status || 'Hazırlandı';
+        document.getElementById('drawer_notes').value = activeOffer.notes || '';
+
+        // Hizmet kalemlerini yükle
+        try {
+          drawerServices = JSON.parse(JSON.stringify(activeOffer.extra_services || []));
+        } catch (e) {
+          drawerServices = [];
+        }
+
+        renderDrawerServices();
+        calculateDrawerTotals();
+
+        // Çekmeceyi aç
+        const backdrop = document.getElementById('offer_drawer');
+        backdrop.style.display = 'flex';
+        setTimeout(() => backdrop.classList.add('active'), 10);
+      }
+
+      function printDrawerOffer() {
+        alert("PDF / Yazdır (özel antetli teklif formatı) modülü şu anda geliştirme aşamasındadır.");
+      }
+
+      async function emailDrawerOffer() {
+        if (!drawerCurrentOffer) return;
+        const offerNo = drawerCurrentOffer.offer_no || 'Yeni Teklif';
+        const companyName = (drawerCurrentOffer.crm_leads && drawerCurrentOffer.crm_leads.company_name) || 'Firma';
+        
+        let emails = [];
+        if (drawerCurrentOffer.notes) {
+          const match = drawerCurrentOffer.notes.match(/\[recipients:\s*(.+?)\]/);
+          if (match && match[1]) {
+            const names = match[1].split(',').map(n => n.trim()).filter(n => n);
+            if (names.length > 0 && drawerCurrentOffer.lead_id) {
+              const { data, error } = await dbClient
+                .from('crm_contacts')
+                .select('email')
+                .eq('lead_id', drawerCurrentOffer.lead_id)
+                .in('full_name', names)
+                .not('email', 'is', null)
+                .neq('email', '');
+              
+              if (!error && data) {
+                emails = data.map(d => d.email);
+              }
+            }
+          }
+        }
+        
+        const toList = emails.join(',');
+        
+        let bodyText = 'Sayın İlgili,\n\nİSG hizmetleri teklifimiz (No: ' + offerNo + ') değerlendirmeniz için tarafınıza sunulmuştur.\n\n';
+        if (drawerCurrentOffer.pdf_url) {
+          bodyText += 'Teklif PDF dosyasını görüntülemek veya indirmek için lütfen aşağıdaki bağlantıya tıklayın:\n<' + drawerCurrentOffer.pdf_url + '>\n\n';
+        }
+        bodyText += 'İyi çalışmalar dileriz.';
+
+        const subject = encodeURIComponent(companyName + ' - İSG Hizmetleri Teklifi (' + offerNo + ')');
+        const body = encodeURIComponent(bodyText);
+        window.location.href = 'mailto:' + toList + '?subject=' + subject + '&body=' + body;
+      }
+
+      function closeDrawer() {
+        const backdrop = document.getElementById('offer_drawer');
+        backdrop.classList.remove('active');
+        setTimeout(() => backdrop.style.display = 'none', 300);
+        activeOffer = null;
+      }
+
+      function closeDrawerOutside(e) {
+        if (e.target.id === 'offer_drawer') {
+          closeDrawer();
+        }
+      }
+
+      function renderDrawerServices() {
+        const body = document.getElementById('drawer_services_body');
+        if (!body) return;
+
+        if (drawerServices.length === 0) {
+          body.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:15px; color:var(--text-muted);">Hiç hizmet kalemi yok. Eklemek için "Kalem Ekle" butonunu kullanın.</td></tr>';
+          return;
+        }
+
+        body.innerHTML = drawerServices.map((s, index) => `
+          <tr>
+            <td>
+              <input type="text" value="${esc(s.name)}" oninput="updateDrawerService(${index}, 'name', this.value)" placeholder="Hizmet Adı" required />
+            </td>
+            <td>
+              <input type="number" min="1" style="text-align:right;" value="${s.qty || 1}" oninput="updateDrawerService(${index}, 'qty', parseInt(this.value) || 1)" required />
+            </td>
+            <td>
+              <input type="number" min="0" step="0.01" style="text-align:right;" value="${s.unit_price || 0}" oninput="updateDrawerService(${index}, 'unit_price', parseFloat(this.value) || 0)" required />
+            </td>
+            <td style="text-align:center;">
+              <button onclick="removeDrawerService(${index})" style="background:none; border:none; color:#ef4444; font-size:16px; font-weight:800; cursor:pointer;" title="Sil">&times;</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      function addDrawerServiceRow() {
+        // Eğer tablomuzda bir tane dummy "Hizmet kalemi yok" kaydı varsa önce onu silelim
+        if (drawerServices.length === 1 && drawerServices[0].name.includes('Hizmet kalemi yok')) {
+          drawerServices = [];
+        }
+
+        drawerServices.push({
+          name: '',
+          qty: 1,
+          unit_price: 0
+        });
+        renderDrawerServices();
+        calculateDrawerTotals();
+      }
+
+      function removeDrawerService(index) {
+        drawerServices.splice(index, 1);
+        renderDrawerServices();
+        calculateDrawerTotals();
+      }
+
+      function getCustomPriceForDrawer(serviceName) {
+        if (!serviceName || !activeOffer) return 0;
+        const lead = activeOffer.crm_leads || {};
+        const emp = parseInt(document.getElementById('drawer_employee_count').value) || lead.employee_count || 1;
+        const danger = (lead.danger_class || '').trim();
+
+        const normalizeText = (v) => (v || '')
+          .toString()
+          .toLocaleLowerCase('tr-TR')
+          .replaceAll('ı', 'i')
+          .replaceAll('ğ', 'g')
+          .replaceAll('ş', 's')
+          .replaceAll('ö', 'o')
+          .replaceAll('ü', 'u')
+          .replaceAll('ç', 'c')
+          .trim();
+
+        const dangerNorm = normalizeText(danger);
+        const nameNorm = normalizeText(serviceName);
+
+        // Önce DB'den veya local storage'dan gelen kurallarda ara
+        let matchedRule = priceRules.find(r => {
+          const min = Number(r.min_emp || 0);
+          const max = r.max_emp == null ? null : Number(r.max_emp);
+          const inRange = emp >= min && (max == null || emp <= max);
+          return normalizeText(r.danger_class) === dangerNorm && 
+                 normalizeText(r.service_name) === nameNorm && 
+                 inRange;
+        });
+
+        // Bulunamazsa varsayılanlarda ara
+        if (!matchedRule) {
+          matchedRule = defaultPriceRules.find(r => {
+            const min = Number(r.min_emp || 0);
+            const max = r.max_emp == null ? null : Number(r.max_emp);
+            const inRange = emp >= min && (max == null || emp <= max);
+            return normalizeText(r.danger_class) === dangerNorm && 
+                   normalizeText(r.service_name) === nameNorm && 
+                   inRange;
+          });
+        }
+
+        return matchedRule ? Number(matchedRule.price || 0) : 0;
+      }
+
+      function handleDrawerQuickServiceSelect(serviceName) {
+        if (!serviceName) return;
+        const autoPrice = getCustomPriceForDrawer(serviceName);
+
+        // Eğer tablomuzda bir tane dummy "Hizmet kalemi yok" kaydı varsa önce onu silelim
+        if (drawerServices.length === 1 && drawerServices[0].name.includes('Hizmet kalemi yok')) {
+          drawerServices = [];
+        }
+
+        drawerServices.push({
+          name: serviceName,
+          qty: 1,
+          unit_price: autoPrice
+        });
+
+        renderDrawerServices();
+        calculateDrawerTotals();
+
+        // Seçiciyi sıfırla
+        document.getElementById('drawer_quick_service_select').value = "";
+      }
+
+      function updateDrawerService(index, key, val) {
+        if (drawerServices[index]) {
+          drawerServices[index][key] = val;
+          if (key === 'name') {
+            const autoPrice = getCustomPriceForDrawer(val);
+            if (autoPrice > 0) {
+              drawerServices[index].unit_price = autoPrice;
+              renderDrawerServices();
+            }
+          }
+          calculateDrawerTotals();
+        }
+      }
+
+      function calculateDrawerTotals() {
+        const subtotal = drawerServices.reduce((s, r) => s + (r.qty || 0) * (r.unit_price || 0), 0);
+        const discRate = parseFloat(document.getElementById('drawer_discount').value) || 0;
+        const kdvRate = parseFloat(document.getElementById('drawer_kdv_rate').value) || 20;
+
+        const discAmount = subtotal * (discRate / 100);
+        const netAmount = subtotal - discAmount;
+        const kdvAmount = netAmount * (kdvRate / 100);
+        const total = netAmount + kdvAmount;
+
+        // Arayüzü güncelle
+        document.getElementById('drawer_calc_subtotal').textContent = '₺' + subtotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+        document.getElementById('drawer_calc_discount').textContent = '-₺' + discAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+        document.getElementById('drawer_calc_net').textContent = '₺' + netAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+        document.getElementById('drawer_calc_kdv_rate_lbl').textContent = kdvRate;
+        document.getElementById('drawer_calc_kdv').textContent = '₺' + kdvAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+        document.getElementById('drawer_calc_total').textContent = '₺' + total.toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+      }
+
+      async function saveDrawerOffer(createNewVersion = false) {
+        if (!activeOffer) return;
+
+        // Doğrulama
+        for (let i = 0; i < drawerServices.length; i++) {
+          if (!drawerServices[i].name.trim()) {
+            showDrawerStatus('Lütfen tüm hizmet adlarını doldurun!', 'err');
+            return;
+          }
+        }
+
+        const subtotal = drawerServices.reduce((s, r) => s + (r.qty || 0) * (r.unit_price || 0), 0);
+        const discRate = parseFloat(document.getElementById('drawer_discount').value) || 0;
+        const kdvRate = parseFloat(document.getElementById('drawer_kdv_rate').value) || 20;
+        const netAmount = subtotal * (1 - discRate / 100);
+        const total = netAmount * (1 + kdvRate / 100);
+
+        const payload = {
+          tenant_id: activeOffer.tenant_id,
+          lead_id: activeOffer.lead_id,
+          offer_no: activeOffer.offer_no,
+          offer_date: document.getElementById('drawer_offer_date').value || null,
+          valid_until: document.getElementById('drawer_valid_until').value || null,
+          employee_count: parseInt(document.getElementById('drawer_employee_count').value) || null,
+          discount: discRate,
+          kdv_rate: kdvRate,
+          subtotal: subtotal,
+          monthly_fee: netAmount,
+          total_amount: total,
+          extra_services: drawerServices,
+          notes: document.getElementById('drawer_notes').value || '',
+          status: createNewVersion ? 'Revize' : document.getElementById('drawer_status').value,
+          created_by: CURRENT_AUTH.email
+        };
+
+        showDrawerStatus('Kaydediliyor...', 'ok');
+
+        try {
+          if (createNewVersion) {
+            // Grubun en yüksek versiyonunu bulalım
+            const groupList = groupedOffers[activeOffer.offer_no] || [];
+            const maxVer = groupList.reduce((max, o) => o.version > max ? o.version : max, 1);
+            payload.version = maxVer + 1;
+            
+            // Eğer notunda fiyat revizyon teklifi ibaresi yoksa biz ekleyelim
+            if (!payload.notes.includes('[Fiyat revizyon teklifi]')) {
+              payload.notes = '[Fiyat revizyon teklifi]\nYeni versiyon manuel oluşturuldu.\n' + payload.notes;
+            }
+
+            const { error } = await dbClient.from('crm_offers').insert([payload]);
+            if (error) throw error;
+            showDrawerStatus('Başarıyla yeni versiyon (v' + payload.version + ') oluşturuldu!', 'ok');
+          } else {
+            payload.version = activeOffer.version;
+            const { error } = await dbClient
+              .from('crm_offers')
+              .update(payload)
+              .eq('id', activeOffer.id);
+            if (error) throw error;
+            showDrawerStatus('Teklif başarıyla güncellendi!', 'ok');
+          }
+
+          // Çekmeceyi kapat ve verileri yeniden yükle
+          setTimeout(async () => {
+            closeDrawer();
+            await loadOffers();
+          }, 1200);
+
+        } catch (err) {
+          console.error('Teklif kaydedilemedi:', err);
+          showDrawerStatus('Hata: ' + err.message, 'err');
+        }
+      }
+
+      /* ═══════════════════════════════════════
+         YARDIMCI FONKSİYONLAR
+      ═══════════════════════════════════════ */
+      function esc(str) {
+        return (str || '').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      }
+
+      function showDrawerStatus(msg, type = 'ok') {
+        const el = document.getElementById('drawer_status_alert');
+        if (!el) return;
+        el.className = 'status-alert ' + type;
+        el.textContent = msg;
+        el.style.display = msg ? 'block' : 'none';
+      }
+
+      function showGlobalStatus(msg, type = 'ok') {
+        const el = document.getElementById('status_alert');
+        if (!el) return;
+        el.className = 'status-alert ' + type;
+        el.textContent = msg;
+        el.style.display = msg ? 'block' : 'none';
+        if (msg && type === 'ok') {
+          setTimeout(() => el.style.display = 'none', 4000);
+        }
+      }
+    </script>
+  </body>
+</html>

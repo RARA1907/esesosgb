@@ -1,4 +1,4 @@
-// OSGB SaaS Global Yetkilendirme ve Navigasyon Yönetimi
+// isgnova Global Yetkilendirme ve Navigasyon Yönetimi
 // Gerçek Supabase auth - mock değil!
 
 // isgnova platform marka favicon'u (her sayfaya enjekte edilir)
@@ -13,6 +13,19 @@
 
 window.CUSTOM_ROLES = {}; // key: role_key, value: role_name
 window.ROLE_PERMISSIONS = []; // array of { role, page, can_view, can_action }
+
+// Apply saved theme palette on load
+(function() {
+  const savedPalette = localStorage.getItem('isgnova_palette');
+  if (savedPalette && document.body) {
+    document.body.classList.add(savedPalette);
+  } else if (savedPalette) {
+    document.addEventListener('DOMContentLoaded', () => {
+       document.body.classList.add(savedPalette);
+    });
+  }
+})();
+
 
 window.loadTenantCustomRolesAndPermissions = async function (tenantId) {
   if (!window.dbClient || !tenantId) return;
@@ -132,11 +145,13 @@ window.canAccessPage = function (role, page) {
   }
 
   if (role === 'admin') return true;
-  if (page === 'crm' || page === 'crm-reports') return true;
-  if (role === 'sales') return page === 'crm' || page === 'crm-reports';
+  const crmPages = ['crm', 'crm-reports', 'crm-prices', 'crm-offers', 'crm-contracts', 'settings'];
+  if (crmPages.includes(page)) return true;
+  if (role === 'sales') return crmPages.includes(page);
   if (['risk', 'accidents', 'near_miss', 'training', 'ppe', 'periodic', 'actions'].includes(page)) return role === 'uzman';
   if (page === 'medical') return role === 'hekim';
   if (page === 'staff') return false;
+  if (page === 'settings') return role === 'admin';
   if (['company', 'workers', 'schedule'].includes(page)) return ['uzman', 'hekim', 'dsp'].includes(role);
   return true;
 };
@@ -170,7 +185,6 @@ window.applyRoleBasedNavigation = function (role) {
     { id: 'staff', href: 'staff.html', text: 'Personel Yönetimi', icon: '🔑' },
     { id: 'permissions', href: 'permissions.html', text: 'Erişim Yetkileri', icon: '🔐' },
     { id: 'crm', href: 'crm.html', text: 'CRM', icon: '📊' },
-    { id: 'crm-reports', href: 'crm-reports.html', text: 'CRM Raporları', icon: '📈' },
     { id: 'schedule', href: 'schedule.html', text: 'Ziyaret Takibi', icon: '📅' },
     { id: 'company', href: 'index.html', text: 'Firma Yönetimi', icon: '🏢' },
     { id: 'workers', href: 'workers.html', text: 'Kadro Yönetimi', icon: '👥' },
@@ -183,7 +197,8 @@ window.applyRoleBasedNavigation = function (role) {
     { id: 'ppe', href: 'ppe.html', text: 'KKD Zimmet', icon: '🧤' },
     { id: 'periodic', href: 'periodic.html', text: 'Periyodik Kontrol', icon: '🛠️' },
     { id: 'defter', href: 'defter.html', text: 'Dijital Onaylı Defter', icon: '📘' },
-    { id: 'kurul', href: 'kurul.html', text: 'İSG Kurul Toplantı Motoru', icon: '🪧' }
+    { id: 'kurul', href: 'kurul.html', text: 'İSG Kurul Toplantı Motoru', icon: '🪧' },
+    { id: 'settings', href: 'settings.html', text: 'Ayarlar', icon: '⚙️' }
   ];
 
   const currentPath = window.location.pathname.split('/').pop() || 'dashboard.html';
@@ -198,8 +213,8 @@ window.applyRoleBasedNavigation = function (role) {
     } else {
       if (item.id === 'dashboard') visible = true;
       else if (item.id === 'saas') visible = false;
-      else if (item.id === 'crm' || item.id === 'crm-reports') {
-        visible = window.canAccessPage(role, item.id);
+      else if (item.id === 'crm') {
+        visible = window.canAccessPage(role, 'crm');
       }
       else if (item.id === 'company') visible = window.canAccessPage(role, 'company');
       else if (item.id === 'workers') visible = window.canAccessPage(role, 'workers');
@@ -221,13 +236,18 @@ window.applyRoleBasedNavigation = function (role) {
 window.setTenantBranding = function (tenant) {
   const titleEl = document.getElementById('lbl_osgb_title');
   if (titleEl) {
-    titleEl.innerText = tenant && tenant.name ? tenant.name : 'Eses Software';
+    let name = tenant && tenant.name ? tenant.name : 'isgnova';
+    if (name === 'Eses Software' || name === 'Eses Test OSGB') name = 'isgnova';
+    titleEl.innerText = name;
   }
   const area = titleEl ? titleEl.closest('.logo-area') : null;
   if (!area) return;
 
   let img = area.querySelector('.tenant-logo-img');
-  const logoUrl = tenant && tenant.logo_url ? tenant.logo_url : '';
+  let logoUrl = tenant && tenant.logo_url ? tenant.logo_url : '';
+  if (tenant && (tenant.name === 'Eses Software' || tenant.name === 'Eses Test OSGB')) {
+    logoUrl = 'brand/mark.svg';
+  }
   if (logoUrl) {
     if (!img) {
       img = document.createElement('img');

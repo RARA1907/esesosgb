@@ -1,9 +1,13 @@
 <!doctype html>
 <html lang="tr">
   <head>
+    <link rel="icon" type="image/svg+xml" href="brand/mark.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="brand/assets/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="brand/assets/favicon-16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="brand/assets/apple-touch-icon.png" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>OSGB SaaS – CRM Fırsat Detayı</title>
+    <title>isgnova – CRM Fırsat Detayı</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="css/style.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -18,7 +22,7 @@
     <div class="card">
       <div class="global-header">
         <div class="top-row">
-          <div class="logo-area"><span id="lbl_osgb_title">Eses Software</span> <span class="logo-badge">SaaS</span></div>
+          <div class="logo-area"><span id="lbl_osgb_title">isgnova</span> <span class="logo-badge">SaaS</span></div>
           <div class="controls-group">
             <div class="user-info">👤 <span id="current_user_email">...</span></div>
             <button class="logout-btn" onclick="handleLogout()">Güvenli Çıkış</button>
@@ -107,6 +111,10 @@
               </select>
             </div>
             <div class="form-group"><label>Adres</label><input type="text" id="g_address" /></div>
+            <div class="form-group full" id="g_lost_reason_group" style="display: none;">
+              <label style="color: #dc2626; font-weight: 600;">❌ Fırsat Kayıp Nedeni</label>
+              <input type="text" id="g_lost_reason" readonly style="background: #fef2f2; color: #991b1b; border-color: #fca5a5; font-weight: 500;" />
+            </div>
             <div class="form-group full"><label>Notlar</label><textarea id="g_notes" rows="3"></textarea></div>
           </div>
           <div class="save-row"><button class="btn-primary" onclick="saveGeneral()">💾 Kaydet</button></div>
@@ -496,8 +504,14 @@
       }
 
       function fillGeneral(d) {
-        const fields = { g_company_name:'company_name', g_tax_no:'tax_no', g_tax_office:'tax_office', g_sector:'sector', g_nace_code:'nace_code', g_danger_class:'danger_class', g_employee_count:'employee_count', g_city:'city', g_district:'district', g_website:'website', g_lead_source:'lead_source', g_address:'address', g_notes:'notes' };
+        const fields = { g_company_name:'company_name', g_tax_no:'tax_no', g_tax_office:'tax_office', g_sector:'sector', g_nace_code:'nace_code', g_danger_class:'danger_class', g_employee_count:'employee_count', g_city:'city', g_district:'district', g_website:'website', g_lead_source:'lead_source', g_address:'address', g_notes:'notes', g_lost_reason:'lost_reason' };
         Object.entries(fields).forEach(([id, key]) => { const el = document.getElementById(id); if (el) el.value = d[key] || ''; });
+        
+        const lostReasonGroup = document.getElementById('g_lost_reason_group');
+        if (lostReasonGroup) {
+          const isLost = resolveLeadStatus(d) === 'Kaybedildi';
+          lostReasonGroup.style.display = isLost ? 'block' : 'none';
+        }
       }
 
       function checkConversionSection(d) {
@@ -517,20 +531,100 @@
         }
       }
 
+      let previousLeadStatus = '';
+
       function updateLeadStatus() {
         const status = document.getElementById('status_select').value;
+        if (status === 'Kaybedildi') {
+          openLostReasonModal();
+          return;
+        }
+        saveLeadStatusToDb(status, null);
+      }
+
+      function saveLeadStatusToDb(status, lostReason) {
         dbClient
           .from('crm_leads')
-          .update({ lead_status: status, updated_at: new Date().toISOString() })
+          .update({ 
+            lead_status: status, 
+            lost_reason: lostReason,
+            updated_at: new Date().toISOString() 
+          })
           .eq('id', LEAD_ID)
           .then(({ error }) => {
             if (error) {
               showStatus('general_status', '❌ Durum güncellenemedi: ' + error.message, 'error');
+              document.getElementById('status_select').value = currentLead.lead_status || 'Fırsat';
               return;
             }
             currentLead.lead_status = status;
+            currentLead.lost_reason = lostReason;
             checkConversionSection(currentLead);
+            fillHeader(currentLead);
+            fillGeneral(currentLead);
+            showStatus('general_status', '✅ Durum güncellendi.', 'ok');
           });
+      }
+
+      function openLostReasonModal() {
+        previousLeadStatus = currentLead.lead_status || 'Fırsat';
+        const select = document.getElementById('lost_reason_select');
+        const customInput = document.getElementById('lost_reason_custom');
+        const customGroup = document.getElementById('custom_lost_reason_group');
+        const currentReason = currentLead.lost_reason || '';
+        
+        select.value = '';
+        customInput.value = '';
+        customGroup.style.display = 'none';
+
+        if (currentReason) {
+          const options = Array.from(select.options).map(o => o.value);
+          if (options.includes(currentReason)) {
+            select.value = currentReason;
+          } else {
+            select.value = 'Diğer';
+            customInput.value = currentReason;
+            customGroup.style.display = 'block';
+          }
+        }
+
+        document.getElementById('lost_reason_modal').style.display = 'flex';
+      }
+
+      function toggleCustomLostReason() {
+        const select = document.getElementById('lost_reason_select').value;
+        const customGroup = document.getElementById('custom_lost_reason_group');
+        customGroup.style.display = select === 'Diğer' ? 'block' : 'none';
+        if (select !== 'Diğer') {
+          document.getElementById('lost_reason_custom').value = '';
+        }
+      }
+
+      function cancelLostReason() {
+        document.getElementById('lost_reason_modal').style.display = 'none';
+        document.getElementById('status_select').value = previousLeadStatus;
+      }
+
+      function confirmLostReason() {
+        const selectVal = document.getElementById('lost_reason_select').value;
+        const customVal = document.getElementById('lost_reason_custom').value.trim();
+
+        if (!selectVal) {
+          alert('Lütfen bir kayıp nedeni seçin.');
+          return;
+        }
+
+        let lostReason = selectVal;
+        if (selectVal === 'Diğer') {
+          if (!customVal) {
+            alert('Lütfen kayıp nedenini yazın.');
+            return;
+          }
+          lostReason = customVal;
+        }
+
+        document.getElementById('lost_reason_modal').style.display = 'none';
+        saveLeadStatusToDb('Kaybedildi', lostReason);
       }
 
       async function autoUpdateStatusToProgress() {
@@ -1153,18 +1247,22 @@
           opt.value = o.id; opt.text = o.offer_no + ' v' + o.version + ' – ₺' + Number(o.total_amount || 0).toLocaleString('tr-TR');
           ctOfferSel.appendChild(opt);
         });
-        list.innerHTML = data.map(o => `
-          <div class="offer-card">
-            <div>
-              <div class="offer-num">${esc(o.offer_no)} — v${o.version} <span style="font-size:11px;color:var(--text-muted)">${formatDate(o.offer_date)}</span></div>
-              <div style="font-size:12px;color:var(--text-muted);margin-top:3px;">${esc(o.status)} · ${o.employee_count || '-'} çalışan · Geçerlilik: ${formatDate(o.valid_until)}</div>
+        list.innerHTML = data.map(o => {
+          const isRevision = o.notes && o.notes.includes('[Fiyat revizyon teklifi]');
+          const revLabel = isRevision ? ' <span style="background:#dcfce7;color:#166534;font-size:10px;padding:2px 6px;border-radius:4px;font-weight:700;margin-left:6px;">Fiyat Revizyon Teklifi</span>' : '';
+          return `
+            <div class="offer-card">
+              <div>
+                <div class="offer-num">${esc(o.offer_no)} — v${o.version}${revLabel} <span style="font-size:11px;color:var(--text-muted)">${formatDate(o.offer_date)}</span></div>
+                <div style="font-size:12px;color:var(--text-muted);margin-top:3px;">${esc(o.status)} · ${o.employee_count || '-'} çalışan · Geçerlilik: ${formatDate(o.valid_until)}</div>
+              </div>
+              <div style="text-align:right;">
+                <div class="offer-amount">₺${Number(o.total_amount || 0).toLocaleString('tr-TR')}</div>
+                <a href="crm-offer.html?id=${o.id}" class="btn-sm btn-view" style="text-decoration:none;display:inline-block;margin-top:4px">Düzenle</a>
+              </div>
             </div>
-            <div style="text-align:right;">
-              <div class="offer-amount">₺${Number(o.total_amount || 0).toLocaleString('tr-TR')}</div>
-              <a href="crm-offer.html?id=${o.id}" class="btn-sm btn-view" style="text-decoration:none;display:inline-block;margin-top:4px">Düzenle</a>
-            </div>
-          </div>
-        `).join('');
+          `;
+        }).join('');
       }
 
       async function loadContractStaffOptions() {
@@ -1783,6 +1881,43 @@
           </div>
         </div>
 
+      </div>
+    </div>
+
+    <!-- Lost Reason Modal -->
+    <div id="lost_reason_modal" class="modal-backdrop-premium">
+      <div class="modal-card-premium" style="max-width: 480px;">
+        <div class="modal-head" style="padding: 20px 24px; border-bottom: 1px solid var(--uc-line);">
+          <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: var(--uc-text-main);">❌ Kayıp Nedeni Belirleyin</h3>
+        </div>
+        <div class="modal-body" style="padding: 20px 24px;">
+          <div class="form-group" style="margin-bottom: 16px; display: flex; flex-direction: column; gap: 8px;">
+            <label style="font-size: 13px; font-weight: 600; color: #4b5563;">Kayıp Nedeni *</label>
+            <select id="lost_reason_select" style="width: 100%; padding: 10px 12px; border: 1px solid var(--uc-line); border-radius: 8px; font-family: inherit; font-size: 14px;" onchange="toggleCustomLostReason()">
+              <option value="">Seçiniz...</option>
+              <option value="Yüksek Fiyat / Bütçe Uyuşmazlığı">Yüksek Fiyat / Bütçe Uyuşmazlığı</option>
+              <option value="Rakibin Daha Düşük Fiyat Vermesi">Rakibin Daha Düşük Fiyat Vermesi</option>
+              <option value="Ödeme Koşullarında Anlaşmazlık">Ödeme Koşullarında Anlaşmazlık</option>
+              <option value="Rakip Firma Tercih Edildi">Rakip Firma Tercih Edildi</option>
+              <option value="Mevcut OSGB ile Devam Kararı">Mevcut OSGB ile Devam Kararı</option>
+              <option value="Eksik Hizmet Kapsamı / Yetersizlik">Eksik Hizmet Kapsamı / Yetersizlik</option>
+              <option value="Lokasyon / Bölge Kapsamı Dışında">Lokasyon / Bölge Kapsamı Dışında</option>
+              <option value="Proje / Alım İptal Edildi">Proje / Alım İptal Edildi</option>
+              <option value="Kendi Bünyesinde Çözme Kararı">Kendi Bünyesinde Çözme Kararı</option>
+              <option value="Yetersiz İletişim / Takip Eksikliği">Yetersiz İletişim / Takip Eksikliği</option>
+              <option value="Hizmete Uygun Değil">Hizmete Uygun Değil</option>
+              <option value="Diğer">Diğer (Lütfen yazınız)</option>
+            </select>
+          </div>
+          <div class="form-group" id="custom_lost_reason_group" style="display: none; margin-bottom: 16px; display: flex; flex-direction: column; gap: 8px;">
+            <label style="font-size: 13px; font-weight: 600; color: #4b5563;">Diğer Kayıp Nedeni *</label>
+            <input type="text" id="lost_reason_custom" placeholder="Nedeni buraya yazın..." style="width: 100%; padding: 10px 12px; border: 1px solid var(--uc-line); border-radius: 8px; font-family: inherit; font-size: 14px;" />
+          </div>
+        </div>
+        <div class="modal-footer" style="padding: 16px 24px; border-top: 1px solid var(--uc-line); display: flex; justify-content: flex-end; gap: 12px; background: #f8fafc; border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;">
+          <button class="btn-wiz-prev" onclick="cancelLostReason()" style="padding: 8px 16px; border: 1px solid var(--uc-line); background: white; border-radius: 8px; cursor: pointer; font-weight: 500; font-family: inherit;">İptal</button>
+          <button class="btn-wiz-next" onclick="confirmLostReason()" style="padding: 8px 16px; background: #dc2626; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; font-family: inherit;">Kaydet</button>
+        </div>
       </div>
     </div>
 

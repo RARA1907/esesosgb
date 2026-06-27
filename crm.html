@@ -1,10 +1,14 @@
 <!doctype html>
 <html lang="tr">
   <head>
+    <link rel="icon" type="image/svg+xml" href="brand/mark.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="brand/assets/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="brand/assets/favicon-16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="brand/assets/apple-touch-icon.png" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>OSGB SaaS – CRM Fırsat Yönetimi</title>
-    <meta name="description" content="OSGB SaaS CRM – Potansiyel müşteri takibi ve aşama yönetimi" />
+    <title>isgnova – CRM Fırsat Yönetimi</title>
+    <meta name="description" content="isgnova CRM – Potansiyel müşteri takibi ve aşama yönetimi" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="css/style.css" />
     <script defer src="js/supabase-config.js"></script>
@@ -21,7 +25,7 @@
       <div class="global-header">
         <div class="top-row">
           <div class="logo-area">
-            <span id="lbl_osgb_title">Eses Software</span> <span class="logo-badge">SaaS</span>
+            <span id="lbl_osgb_title">isgnova</span> <span class="logo-badge">SaaS</span>
           </div>
           <div class="controls-group">
             <div class="user-info">👤 <span id="current_user_email">...</span></div>
@@ -31,11 +35,20 @@
         <div class="nav-container"></div>
       </div>
 
+      <div class="crm-sub-nav">
+        <a href="crm.html" class="crm-sub-nav-btn crm-sub-active">👥 Müşteri Yönetimi</a>
+        <a href="crm-prices.html" class="crm-sub-nav-btn">💰 Fiyat Listesi</a>
+        <a href="crm-offers.html" class="crm-sub-nav-btn">📝 Teklif Yönetimi</a>
+        <a href="crm-contracts.html" class="crm-sub-nav-btn">📄 Sözleşme Yönetimi</a>
+
+        <a href="crm-reports.html" class="crm-sub-nav-btn">📈 CRM Raporları</a>
+      </div>
+
       <div class="crm-page-shell">
         <!-- Page Title & Actions -->
         <div class="page-header-row">
           <div class="page-title-group">
-            <h2>Potansiyel Müşteri Yönetimi</h2>
+            <h2>Müşteri Yönetimi</h2>
             <p>Satış fırsatlarını, görüşmeleri ve teklif süreçlerini anlık takip edin.</p>
           </div>
           <div style="display: flex; gap: 10px; align-items: center;">
@@ -47,8 +60,6 @@
                 Liste
               </button>
             </div>
-            <button class="btn btn-secondary" onclick="exportLeadsToCSV()" style="padding: 10px 14px; display: inline-flex; align-items: center; gap: 6px; font-weight: 700; border-radius: 8px;">📤 Dışa Aktar</button>
-            <button class="btn btn-blue" onclick="openImportModal()" style="padding: 10px 14px; display: inline-flex; align-items: center; gap: 6px; font-weight: 700; border-radius: 8px; border: 1px solid #bfe4e6 !important;">📥 İçeri Aktar</button>
             <button class="btn-add-lead-btn" onclick="openAddModal()">+ Yeni Fırsat Ekle</button>
           </div>
         </div>
@@ -307,42 +318,6 @@
       </div>
     </div>
 
-    <!-- 📥 CRM VERİ İÇERİ AKTARMA MODALI -->
-    <div class="modal-backdrop-premium" id="import_lead_modal">
-      <div class="modal-card-premium" style="max-width: 500px;">
-        <div class="modal-header-premium">
-          <h3>📥 Excel / CSV ile Fırsat Aktar</h3>
-          <button class="modal-close-btn" onclick="closeImportModal()">&times;</button>
-        </div>
-        <div class="modal-body-premium">
-          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.5;">
-            Hazırladığınız potansiyel müşteri listesini sisteme toplu olarak yükleyebilirsiniz. Yüklenecek dosya formatı <strong>CSV</strong> olmalıdır.
-          </p>
-          
-          <div style="background: var(--uc-surface-muted); border: 1px solid var(--uc-line); padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 12px;">
-            <strong style="display: block; margin-bottom: 6px; color: var(--uc-text);">Gerekli CSV Sütun Sıralaması (Noktalı Virgül ";" Ayracı):</strong>
-            <code style="word-break: break-all; display: block; background: var(--uc-surface); border: 1px solid var(--uc-line); padding: 6px; border-radius: 4px; color: var(--uc-primary); font-family: monospace;">
-              Firma Adı; Şehir; İlçe; Sektör; Nace Kodu; Tehlike Sınıfı; Çalışan Sayısı; Aşama; Durum; Kaynak; Notlar
-            </code>
-            <a href="javascript:void(0)" onclick="downloadSampleCSV()" style="color: var(--uc-primary); font-weight: 700; text-decoration: none; display: inline-block; margin-top: 8px;">📥 Örnek Şablon CSV İndir</a>
-          </div>
-
-          <div class="form-group-premium full-width">
-            <label>CSV Dosyası Seçin</label>
-            <input type="file" id="import_csv_file" accept=".csv" style="padding: 8px 0; border: none; background: transparent;" />
-          </div>
-          
-          <div id="import_progress_status" style="font-size: 12px; color: var(--uc-text-muted); margin-top: 10px; display: none;">
-            Lütfen bekleyin, veriler işleniyor...
-          </div>
-        </div>
-        <div class="modal-footer-premium">
-          <button class="btn-secondary-premium" onclick="closeImportModal()">İptal</button>
-          <button class="btn-add-lead-btn" onclick="processCSVImport()">Verileri Yükle</button>
-        </div>
-      </div>
-    </div>
-
     <!-- Toast Notifications container -->
     <div class="toast-container" id="toast_container"></div>
 
@@ -550,7 +525,6 @@
             .from('crm_leads')
             .select('*')
             .eq('tenant_id', CURRENT_AUTH.tenant_id)
-            .eq('is_converted', false)
             .order('updated_at', { ascending: false });
 
           if (error) throw error;
@@ -816,6 +790,7 @@
                   ${l.danger_class ? `<span class="card-badge ${dangerBadgeClass}">${esc(l.danger_class)}</span>` : ''}
                   ${l.lead_source ? `<span class="card-badge badge-source">${esc(l.lead_source)}</span>` : ''}
                   <span class="status-pill ${statusClass}">${esc(statusLabel)}</span>
+                  ${l.is_converted ? `<span class="status-pill st-kazanildi" style="background:#dcfce7;color:#166534;border:1px solid #bbf7d0;">👤 Aktif Müşteri</span>` : ''}
                 </div>
                 <div class="kanban-card-footer">
                   <div class="assigned-avatar" title="${esc(staffName)}">👤 ${esc(staffName)}</div>
@@ -874,6 +849,7 @@
               </td>
               <td>
                 <span class="status-pill ${statusClass}">${esc(statusLabel)}</span>
+                ${l.is_converted ? `<div style="font-size:10px;color:#166534;font-weight:700;margin-top:4px;">👤 Aktif Müşteri</div>` : ''}
               </td>
               <td>
                 <span class="badge badge-gray">${esc(l.lead_source)}</span>
@@ -1096,213 +1072,7 @@
         });
       }
 
-      // --- IMPORT & EXPORT METOTLARI ---
 
-      window.openImportModal = function() {
-        document.getElementById('import_lead_modal').classList.add('open');
-      }
-
-      window.closeImportModal = function() {
-        document.getElementById('import_lead_modal').classList.remove('open');
-        document.getElementById('import_csv_file').value = '';
-        const status = document.getElementById('import_progress_status');
-        status.style.display = 'none';
-        status.innerText = '';
-      }
-
-      // Örnek CSV Dosyası İndir (UTF-8 BOM ve Noktalı Virgül ";" ayracı ile)
-      window.downloadSampleCSV = function() {
-        const headers = ["Firma Adı", "Şehir", "İlçe", "Sektör", "Nace Kodu", "Tehlike Sınıfı", "Çalışan Sayısı", "Aşama", "Durum", "Kaynak", "Notlar"];
-        const sampleRow = ["Örnek Metal Sanayi A.Ş.", "Eskişehir", "Odunpazarı", "Metal İşleme", "25.50.01", "Çok Tehlikeli", "45", "Yeni Kayıt", "Fırsat", "Telefon", "İlk görüşme yapıldı ilgi yüksek."];
-        
-        const csvContent = "\uFEFF" + [headers.join(";"), sampleRow.join(";")].join("\n");
-        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", "crm_lead_sablon.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
-
-      // CSV Metin Ayrıştırıcı (Tırnak ve Ayrıcı Duyarlı)
-      function parseCSVText(text) {
-        const lines = [];
-        let row = [""];
-        let inQuotes = false;
-        
-        for (let i = 0; i < text.length; i++) {
-          const char = text[i];
-          const next = text[i+1];
-          
-          if (char === '"') {
-            if (inQuotes && next === '"') {
-              row[row.length - 1] += '"';
-              i++;
-            } else {
-              inQuotes = !inQuotes;
-            }
-          } else if ((char === ',' || char === ';') && !inQuotes) {
-            row.push("");
-          } else if ((char === '\r' || char === '\n') && !inQuotes) {
-            if (char === '\r' && next === '\n') {
-              i++;
-            }
-            lines.push(row);
-            row = [""];
-          } else {
-            row[row.length - 1] += char;
-          }
-        }
-        if (row.length > 1 || row[0] !== "") {
-          lines.push(row);
-        }
-        return lines;
-      }
-
-      // CSV Dosyasını Yükleme İşlemi
-      window.processCSVImport = async function() {
-        const fileInput = document.getElementById('import_csv_file');
-        const file = fileInput.files && fileInput.files[0];
-        const statusEl = document.getElementById('import_progress_status');
-
-        if (!file) {
-          showToast('Lütfen önce bir CSV dosyası seçin.', 'error');
-          return;
-        }
-
-        statusEl.style.display = 'block';
-        statusEl.innerText = 'Dosya okunuyor...';
-        statusEl.style.color = 'var(--uc-text-muted)';
-
-        const reader = new FileReader();
-        reader.onload = async function(e) {
-          try {
-            const text = e.target.result;
-            const parsedLines = parseCSVText(text);
-
-            if (parsedLines.length < 2) {
-              showToast('CSV dosyasında veri satırı bulunamadı.', 'error');
-              statusEl.innerText = 'Aktarım iptal edildi.';
-              statusEl.style.color = '#b91c1c';
-              return;
-            }
-
-            const rowsToInsert = [];
-            statusEl.innerText = 'Satırlar ayrıştırılıyor...';
-
-            for (let i = 1; i < parsedLines.length; i++) {
-              const row = parsedLines[i];
-              if (row.length < 1 || !row[0] || !row[0].trim()) continue;
-
-              const companyName = row[0] ? row[0].trim() : '';
-              if (!companyName) continue;
-
-              const city = row[1] ? row[1].trim() : null;
-              const district = row[2] ? row[2].trim() : null;
-              const sector = row[3] ? row[3].trim() : null;
-              const naceCode = row[4] ? row[4].trim() : null;
-              const dangerClass = row[5] ? row[5].trim() : null;
-              const employeeCountRaw = row[6] ? row[6].trim() : '';
-              const employeeCount = employeeCountRaw ? parseInt(employeeCountRaw) : null;
-              
-              const stageRaw = row[7] ? row[7].trim() : 'Yeni Kayıt';
-              const stageDb = stageToDbValue(normalizeStage(stageRaw));
-
-              const statusRaw = row[8] ? row[8].trim() : 'Fırsat';
-              const leadStatus = LEAD_STATUSES.includes(statusRaw) ? statusRaw : 'Fırsat';
-
-              const leadSource = row[9] ? row[9].trim() : 'Telefon';
-              const notes = row[10] ? row[10].trim() : null;
-
-              rowsToInsert.push({
-                tenant_id: CURRENT_AUTH.tenant_id,
-                company_name: companyName,
-                city: city || null,
-                district: district || null,
-                sector: sector || null,
-                nace_code: naceCode || null,
-                danger_class: dangerClass || null,
-                employee_count: isNaN(employeeCount) ? null : employeeCount,
-                stage: stageDb,
-                lead_status: leadStatus,
-                lead_source: leadSource,
-                notes: notes || null,
-                created_by: CURRENT_AUTH.email
-              });
-            }
-
-            if (rowsToInsert.length === 0) {
-              showToast('Geçerli veri satırı bulunamadı.', 'error');
-              statusEl.innerText = 'Aktarım iptal edildi.';
-              return;
-            }
-
-            statusEl.innerText = `${rowsToInsert.length} kayıt veritabanına yükleniyor...`;
-
-            const { data, error } = await dbClient
-              .from('crm_leads')
-              .insert(rowsToInsert)
-              .select();
-
-            if (error) throw error;
-
-            showToast(`${rowsToInsert.length} potansiyel firma başarıyla içeri aktarıldı.`, 'success');
-            closeImportModal();
-            await loadLeads();
-
-          } catch (err) {
-            console.error('Import hatası:', err);
-            showToast('Aktarım sırasında bir hata oluştu: ' + err.message, 'error');
-            statusEl.innerText = 'Hata oluştu.';
-            statusEl.style.color = '#b91c1c';
-          }
-        };
-        reader.readAsText(file);
-      }
-
-      // Verileri Dışa Aktar (CSV)
-      window.exportLeadsToCSV = function() {
-        const leads = getFilteredLeads();
-        if (leads.length === 0) {
-          showToast('Dışa aktarılacak potansiyel firma bulunmuyor.', 'error');
-          return;
-        }
-
-        const headers = ["Firma Adı", "Şehir", "İlçe", "Sektör", "Nace Kodu", "Tehlike Sınıfı", "Çalışan Sayısı", "Aşama", "Durum", "Kaynak", "Notlar", "Oluşturulma Tarihi"];
-        
-        const rows = leads.map(l => {
-          const statusLabel = resolveLeadStatus(l);
-          return [
-            `"${(l.company_name || '').replace(/"/g, '""')}"`,
-            `"${(l.city || '').replace(/"/g, '""')}"`,
-            `"${(l.district || '').replace(/"/g, '""')}"`,
-            `"${(l.sector || '').replace(/"/g, '""')}"`,
-            `"${(l.nace_code || '').replace(/"/g, '""')}"`,
-            `"${(l.danger_class || '').replace(/"/g, '""')}"`,
-            l.employee_count || '',
-            `"${(l.stage || '').replace(/"/g, '""')}"`,
-            `"${statusLabel}"`,
-            `"${(l.lead_source || '').replace(/"/g, '""')}"`,
-            `"${(l.notes || '').replace(/"/g, '""')}"`,
-            l.created_at || ''
-          ];
-        });
-
-        // Excel uyumu için UTF-8 BOM ve noktalı virgül ayracı kullanıldı
-        const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map(r => r.join(";"))].join("\n");
-        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", `crm_lead_ihracat_${new Date().toISOString().slice(0,10)}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        showToast(`${leads.length} kayıt başarıyla dışa aktarıldı.`, 'success');
-      }
     </script>
   </body>
 </html>
