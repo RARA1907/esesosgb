@@ -163,6 +163,8 @@
                 <option value="crm_contacts">👥 İletişim Kişileri (crm_contacts)</option>
                 <option value="crm_offers">📝 Teklifler (crm_offers)</option>
                 <option value="crm_contracts">📄 Sözleşmeler (crm_contracts)</option>
+                <option value="crm_activities">💬 Görüşmeler & Aktiviteler (crm_activities)</option>
+                <option value="crm_tasks">📋 Takip Görevleri (crm_tasks)</option>
                 <option value="osgb_staff">🧑‍💼 Personel Listesi (osgb_staff)</option>
                 <option value="crm_price_list">💰 Fiyat Listesi (crm_price_list)</option>
               </select>
@@ -422,6 +424,25 @@
           mapper: (c) => [
             c.contract_no||'', c.version||'', c.start_date||'', c.end_date||'', c.monthly_fee||'', c.payment_period||'', c.payment_method||'',
             c.is_signed ? 'Evet' : 'Hayır', c.isg_katip_done ? 'Evet' : 'Hayır', c.assigned_uzman||'', c.assigned_hekim||'', c.status||'', c.notes||'', c.created_at||''
+          ]
+        },
+        crm_activities: {
+          title: "💬 Görüşmeler & Aktiviteler",
+          fields: "Görüşme Tipi, Görüşme Tarihi, Özet / Açıklama, Sonraki Aksiyon, Oluşturan, Tarih",
+          headers: ["Görüşme Tipi","Görüşme Tarihi","Özet / Açıklama","Sonraki Aksiyon","Oluşturan","Oluşturulma Tarihi"],
+          select: "activity_type,activity_date,summary,next_action,created_by,created_at",
+          mapper: (a) => [
+            a.activity_type||'', a.activity_date||'', a.summary||'', a.next_action||'', a.created_by||'', a.created_at||''
+          ]
+        },
+        crm_tasks: {
+          title: "📋 Takip Görevleri",
+          fields: "Görev Başlığı, Sorumlu, Son Tarih, Öncelik, Durum, Aktivite Tipi, Notlar, Tamamlanma Tarihi, Oluşturan, Tarih",
+          headers: ["Görev Başlığı","Sorumlu","Son Tarih","Öncelik","Durum","Aktivite Tipi","Notlar","Tamamlanma Tarihi","Oluşturan","Oluşturulma Tarihi"],
+          select: "title,assigned_to,due_date,priority,status,activity_type,notes,completed_at,created_by,created_at",
+          mapper: (t) => [
+            t.title||'', t.assigned_to||'', t.due_date||'', t.priority||'', t.status||'', t.activity_type||'',
+            t.notes||'', t.completed_at||'', t.created_by||'', t.created_at||''
           ]
         },
         osgb_staff: {
