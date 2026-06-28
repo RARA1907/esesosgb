@@ -136,6 +136,7 @@
         <div class="settings-tabs" id="settings_tabs" style="display: flex; gap: 24px; margin-bottom: 24px; border-bottom: 1px solid #e2e8f0; padding-bottom: 0;">
             <a href="javascript:void(0);" onclick="switchSettingsTab('transfer', this)" style="text-decoration:none; color:var(--transfer-indigo); font-weight:600; border-bottom:2px solid var(--transfer-indigo); padding-bottom:12px; margin-bottom:-1px; font-size: 14.5px;">🔄 Veri Aktarımı</a>
             <a href="javascript:void(0);" onclick="switchSettingsTab('theme', this)" style="text-decoration:none; color:#64748b; font-weight:500; padding-bottom:12px; cursor:pointer; font-size: 14.5px;">🎨 Görünüm & Tema</a>
+            <a href="javascript:void(0);" onclick="switchSettingsTab('security', this)" style="text-decoration:none; color:#64748b; font-weight:500; padding-bottom:12px; cursor:pointer; font-size: 14.5px;">🔒 Şifre Değiştir</a>
             <a href="javascript:void(0);" onclick="alert('Yakında eklenecek')" style="text-decoration:none; color:#64748b; font-weight:500; padding-bottom:12px; cursor:pointer; font-size: 14.5px;">🌍 Dil & Bölge</a>
         </div>
 
@@ -281,6 +282,26 @@
                   <div onclick="setThemePalette('theme-palette-rose')" style="width: 40px; height: 40px; border-radius: 50%; background: #E11D48; cursor: pointer; border: 2px solid transparent; box-shadow:0 2px 4px rgba(0,0,0,0.1);" title="Gül Kurusu"></div>
                   <div onclick="setThemePalette('theme-palette-slate')" style="width: 40px; height: 40px; border-radius: 50%; background: #475569; cursor: pointer; border: 2px solid transparent; box-shadow:0 2px 4px rgba(0,0,0,0.1);" title="Koyu Gri"></div>
               </div>
+        </div>
+
+        <div id="tab_security" style="display:none;">
+          <div style="background: #f8fafc; padding: 24px; border-radius: 12px; border: 1px solid #e2e8f0; max-width: 500px;">
+              <h3 style="margin-top:0; font-size: 16px; color: #0f172a;">🔒 Şifre Değiştir</h3>
+              <p style="font-size: 13px; color: #475569; margin-bottom: 20px;">Sisteme giriş şifrenizi buradan güncelleyebilirsiniz. Yeni şifreniz en az 6 karakterden oluşmalıdır.</p>
+              
+              <div style="margin-bottom: 16px;">
+                  <label style="display:block; font-size:13.5px; font-weight:700; color:#334155; margin-bottom:6px;">Yeni Şifre</label>
+                  <input type="password" id="sec_new_password" placeholder="En az 6 karakter" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px; box-sizing:border-box; font-size:14px;" />
+              </div>
+
+              <div style="margin-bottom: 20px;">
+                  <label style="display:block; font-size:13.5px; font-weight:700; color:#334155; margin-bottom:6px;">Yeni Şifre Tekrar</label>
+                  <input type="password" id="sec_new_password_again" placeholder="Yeni şifrenizi tekrar yazın" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px; box-sizing:border-box; font-size:14px;" />
+              </div>
+
+              <button onclick="updateUserPassword()" id="btn_update_password" style="background: var(--primary, #0E7C86); color:white; border:none; border-radius:8px; padding:10px 18px; font-size:13px; font-weight:800; cursor:pointer; transition:background 0.15s;">
+                  Şifreyi Güncelle
+              </button>
           </div>
         </div>
 
@@ -732,6 +753,7 @@
 
         document.getElementById('tab_transfer').style.display = tabName === 'transfer' ? 'block' : 'none';
         document.getElementById('tab_theme').style.display = tabName === 'theme' ? 'block' : 'none';
+        document.getElementById('tab_security').style.display = tabName === 'security' ? 'block' : 'none';
       }
 
       function setThemePalette(palette) {
@@ -744,6 +766,42 @@
             localStorage.removeItem('isgnova_palette');
         }
         showToast('Tema rengi değiştirildi.', 'success');
+      }
+
+      async function updateUserPassword() {
+        const password = document.getElementById('sec_new_password').value;
+        const passwordAgain = document.getElementById('sec_new_password_again').value;
+
+        if (!password || !passwordAgain) {
+          showToast('Lütfen tüm alanları doldurun.', 'error');
+          return;
+        }
+        if (password.length < 6) {
+          showToast('Yeni şifre en az 6 karakter olmalıdır.', 'error');
+          return;
+        }
+        if (password !== passwordAgain) {
+          showToast('Yeni şifreler eşleşmiyor.', 'error');
+          return;
+        }
+
+        const button = document.getElementById('btn_update_password');
+        button.disabled = true;
+        button.innerText = 'Güncelleniyor...';
+
+        try {
+          const { error } = await dbClient.auth.updateUser({ password: password });
+          if (error) throw error;
+          
+          showToast('Şifreniz başarıyla güncellendi.', 'success');
+          document.getElementById('sec_new_password').value = '';
+          document.getElementById('sec_new_password_again').value = '';
+        } catch (err) {
+          showToast('Hata: ' + err.message, 'error');
+        } finally {
+          button.disabled = false;
+          button.innerText = 'Şifreyi Güncelle';
+        }
       }
 
     </script>

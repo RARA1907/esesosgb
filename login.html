@@ -879,11 +879,26 @@
         </div>
 
         <div class="form-group">
-          <label>Şifre</label>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <label>Şifre</label>
+            <span class="small-link" style="margin: 0; font-size: 13px; color: #64748b; cursor: pointer; text-decoration: underline;" onclick="showForgotPasswordForm()">Şifremi Unuttum</span>
+          </div>
           <input type="password" id="password" placeholder="••••••" />
         </div>
 
         <button id="loginButton" onclick="handleLogin()">Sisteme Giriş Yap</button>
+      </div>
+
+      <div id="forgotPasswordForm" class="hidden">
+        <div class="hint-box">
+          Şifrenizi sıfırlamak için e-posta adresinizi girin. Size bir sıfırlama bağlantısı göndereceğiz.
+        </div>
+        <div class="form-group">
+          <label>E-Posta Adresi</label>
+          <input type="email" id="forgotEmail" placeholder="E-posta adresiniz" />
+        </div>
+        <button id="resetPasswordButton" onclick="handleResetPassword()">Şifre Sıfırlama Bağlantısı Gönder</button>
+        <div class="small-link" onclick="showLoginForm()">Giriş ekranına dön</div>
       </div>
 
       <div id="message"></div>
@@ -948,6 +963,7 @@
       function showInviteForm() {
         document.getElementById('loginForm').classList.add('hidden');
         document.getElementById('inviteForm').classList.remove('hidden');
+        document.getElementById('forgotPasswordForm').classList.add('hidden');
         setMessage('', '#334155');
         applyPrimaryColor(currentPrimaryColor);
       }
@@ -955,8 +971,49 @@
       function showLoginForm() {
         document.getElementById('inviteForm').classList.add('hidden');
         document.getElementById('loginForm').classList.remove('hidden');
+        document.getElementById('forgotPasswordForm').classList.add('hidden');
         setMessage('', '#334155');
         applyPrimaryColor(currentPrimaryColor);
+      }
+
+      function showForgotPasswordForm() {
+        document.getElementById('inviteForm').classList.add('hidden');
+        document.getElementById('loginForm').classList.add('hidden');
+        document.getElementById('forgotPasswordForm').classList.remove('hidden');
+        const currentEmail = document.getElementById('email').value.trim();
+        if (currentEmail) {
+          document.getElementById('forgotEmail').value = currentEmail;
+        }
+        setMessage('', '#334155');
+        applyPrimaryColor(currentPrimaryColor);
+      }
+
+      async function handleResetPassword() {
+        const email = document.getElementById('forgotEmail').value.trim();
+        if (!email) {
+          setMessage('Lütfen e-posta adresinizi girin.', 'red');
+          return;
+        }
+
+        const button = document.getElementById('resetPasswordButton');
+        button.disabled = true;
+        button.innerText = 'Gönderiliyor...';
+        setMessage('Şifre sıfırlama talebi gönderiliyor...', 'blue');
+
+        try {
+          const { error } = await dbClient.auth.resetPasswordForEmail(email, {
+            redirectTo: 'https://isgnova.com/login'
+          });
+
+          if (error) throw error;
+
+          setMessage('Şifre sıfırlama bağlantısı e-postanıza gönderildi.', 'green');
+        } catch (err) {
+          setMessage('Hata oluştu: ' + err.message, 'red');
+        } finally {
+          button.disabled = false;
+          button.innerText = 'Şifre Sıfırlama Bağlantısı Gönder';
+        }
       }
 
       function parseHashParams() {
