@@ -129,16 +129,14 @@
         <div class="nav-container"></div>
       </div>
 
+      <div class="crm-sub-nav" id="settings_tabs">
+        <a href="javascript:void(0);" onclick="switchSettingsTab('transfer', this)" class="crm-sub-nav-btn crm-sub-active">🔄 Veri Aktarımı</a>
+        <a href="javascript:void(0);" onclick="switchSettingsTab('theme', this)" class="crm-sub-nav-btn">🎨 Görünüm & Tema</a>
+        <a href="javascript:void(0);" onclick="switchSettingsTab('security', this)" class="crm-sub-nav-btn">🔒 Şifre Değiştir</a>
+        <a href="javascript:void(0);" onclick="alert('Yakında eklenecek')" class="crm-sub-nav-btn">🌍 Dil & Bölge</a>
+      </div>
+
       <div class="transfer-shell">
-        <h1 class="transfer-page-title" style="margin-top: 10px;">⚙️ Genel Ayarlar</h1>
-        <p class="transfer-page-desc">Sistem ayarlarınızı, tema/dil tercihlerinizi ve veri aktarımı işlemlerini bu alandan yönetebilirsiniz.</p>
-
-        <div class="settings-tabs" id="settings_tabs" style="display: flex; gap: 24px; margin-bottom: 24px; border-bottom: 1px solid #e2e8f0; padding-bottom: 0;">
-            <a href="javascript:void(0);" onclick="switchSettingsTab('transfer', this)" style="text-decoration:none; color:var(--transfer-indigo); font-weight:600; border-bottom:2px solid var(--transfer-indigo); padding-bottom:12px; margin-bottom:-1px; font-size: 14.5px;">🔄 Veri Aktarımı</a>
-            <a href="javascript:void(0);" onclick="switchSettingsTab('theme', this)" style="text-decoration:none; color:#64748b; font-weight:500; padding-bottom:12px; cursor:pointer; font-size: 14.5px;">🎨 Görünüm & Tema</a>
-            <a href="javascript:void(0);" onclick="alert('Yakında eklenecek')" style="text-decoration:none; color:#64748b; font-weight:500; padding-bottom:12px; cursor:pointer; font-size: 14.5px;">🌍 Dil & Bölge</a>
-        </div>
-
         <div id="status_banner" class="import-status-bar" style="display:none; margin-bottom: 20px;"></div>
 
         <div id="tab_transfer">
@@ -149,25 +147,49 @@
             <div class="transfer-card-header">
               <div class="transfer-icon-wrap icon-export">📤</div>
               <div>
-                <p class="transfer-card-title">Dışa Aktar</p>
-                <p class="transfer-card-sub">Tüm müşteri kayıtlarını CSV olarak indir</p>
+                <p class="transfer-card-title">Verileri Dışa Aktar</p>
+                <p class="transfer-card-sub">Sistemdeki verilerinizi seçerek CSV formatında indirin</p>
               </div>
             </div>
             <hr class="transfer-divider" />
-            <div class="transfer-info-box">
+            
+            <div style="margin-bottom: 8px;">
+              <label style="display:block; font-size:13.5px; font-weight:700; color:#334155; margin-bottom:8px;">Dışa Aktarılacak Tablo:</label>
+              <select id="export_table_select" onchange="onExportTableChange()" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px; box-sizing:border-box; font-size:14px; background:#fff;">
+                <optgroup label="CRM Modülü">
+                  <option value="crm_leads" selected>🎯 Fırsat Müşterileri (crm_leads)</option>
+                  <option value="crm_contacts">👥 İletişim Kişileri (crm_contacts)</option>
+                  <option value="crm_offers">📝 Teklifler (crm_offers)</option>
+                  <option value="crm_contracts">📄 Sözleşmeler (crm_contracts)</option>
+                  <option value="crm_activities">💬 Görüşmeler & Aktiviteler (crm_activities)</option>
+                  <option value="crm_tasks">📋 Takip Görevleri (crm_tasks)</option>
+                  <option value="crm_price_list">💰 Fiyat Listesi (crm_price_list)</option>
+                </optgroup>
+                <optgroup label="İSG Kadro & Operasyon Modülü">
+                  <option value="workers">👷 Çalışan Listesi (workers)</option>
+                  <option value="training_attendance_entries">📚 Eğitim Katılım Dersleri (training_attendance_entries)</option>
+                  <option value="training_completions">🎓 Eğitim Tamamlama Durumları (training_completions)</option>
+                  <option value="ppe_assignments">🛡️ KKD Zimmetleri (ppe_assignments)</option>
+                  <option value="ppe_assignment_events">🧾 KKD İşlem Olayları (ppe_assignment_events)</option>
+                  <option value="work_accidents">🚨 İş Kazaları (work_accidents)</option>
+                  <option value="near_miss_reports">⚠️ Ramak Kala Raporları (near_miss_reports)</option>
+                  <option value="risk_assessments">📋 Risk Analizleri (risk_assessments)</option>
+                  <option value="osgb_staff">🧑‍💼 Personel Listesi (osgb_staff)</option>
+                </optgroup>
+              </select>
+            </div>
+
+            <div class="transfer-info-box" id="export_info_box" style="font-size:12px; line-height:1.5;">
               <strong>Dışa aktarılacak sütunlar:</strong>
-              <ul class="col-list">
-                <li>Firma Adı, Şehir, İlçe, Sektör</li>
-                <li>Nace Kodu, Tehlike Sınıfı, Çalışan Sayısı</li>
-                <li>Aşama, Durum, Kaynak, Notlar</li>
-                <li>Oluşturulma Tarihi</li>
-              </ul>
+              <span id="export_fields_desc">Firma Adı, Şehir, İlçe, Sektör, Nace Kodu, Tehlike Sınıfı, Çalışan Sayısı, Aşama, Durum, Kaynak, Notlar, Tarih</span>
             </div>
+            
             <div id="export_count_area" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-height:28px;">
-              <span class="export-count-badge">⏳ Veriler yükleniyor...</span>
+              <span class="export-count-badge" id="export_count_badge">⏳ Sayı hesaplanıyor...</span>
             </div>
-            <button class="btn-transfer-export" onclick="exportLeadsToCSV()">
-              📤 Müşteri Listesini İndir (.csv)
+            
+            <button class="btn-transfer-export" onclick="exportSelectedTable()">
+              📤 Seçilen Tabloyu İndir (.csv)
             </button>
           </div>
 
@@ -273,7 +295,7 @@
               <h3 style="margin-top:0; font-size: 16px; color: #0f172a;">Tema Renk Paleti</h3>
               <p style="font-size: 13px; color: #475569; margin-bottom: 20px;">Sistemin genelinde kullanılacak vurgu (primary) rengini seçin. Seçtiğiniz renk tarayıcınızda hatırlanır.</p>
               
-              <div style="display:flex; gap:16px; flex-wrap: wrap;">
+              <div style="display:flex; gap:16px; flex-wrap: wrap; user-select: none; -webkit-user-select: none;">
                   <div onclick="setThemePalette('')" style="width: 40px; height: 40px; border-radius: 50%; background: #0E7C86; cursor: pointer; border: 2px solid transparent; box-shadow:0 2px 4px rgba(0,0,0,0.1);" title="Turkuaz (Varsayılan)"></div>
                   <div onclick="setThemePalette('theme-palette-blue')" style="width: 40px; height: 40px; border-radius: 50%; background: #2563EB; cursor: pointer; border: 2px solid transparent; box-shadow:0 2px 4px rgba(0,0,0,0.1);" title="Mavi"></div>
                   <div onclick="setThemePalette('theme-palette-emerald')" style="width: 40px; height: 40px; border-radius: 50%; background: #059669; cursor: pointer; border: 2px solid transparent; box-shadow:0 2px 4px rgba(0,0,0,0.1);" title="Zümrüt Yeşili"></div>
@@ -281,6 +303,27 @@
                   <div onclick="setThemePalette('theme-palette-rose')" style="width: 40px; height: 40px; border-radius: 50%; background: #E11D48; cursor: pointer; border: 2px solid transparent; box-shadow:0 2px 4px rgba(0,0,0,0.1);" title="Gül Kurusu"></div>
                   <div onclick="setThemePalette('theme-palette-slate')" style="width: 40px; height: 40px; border-radius: 50%; background: #475569; cursor: pointer; border: 2px solid transparent; box-shadow:0 2px 4px rgba(0,0,0,0.1);" title="Koyu Gri"></div>
               </div>
+          </div>
+        </div>
+
+        <div id="tab_security" style="display:none;">
+          <div style="background: #f8fafc; padding: 24px; border-radius: 12px; border: 1px solid #e2e8f0; max-width: 500px;">
+              <h3 style="margin-top:0; font-size: 16px; color: #0f172a;">🔒 Şifre Değiştir</h3>
+              <p style="font-size: 13px; color: #475569; margin-bottom: 20px;">Sisteme giriş şifrenizi buradan güncelleyebilirsiniz. Yeni şifreniz en az 6 karakterden oluşmalıdır.</p>
+              
+              <div style="margin-bottom: 16px;">
+                  <label style="display:block; font-size:13.5px; font-weight:700; color:#334155; margin-bottom:6px;">Yeni Şifre</label>
+                  <input type="password" id="sec_new_password" placeholder="En az 6 karakter" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px; box-sizing:border-box; font-size:14px;" />
+              </div>
+
+              <div style="margin-bottom: 20px;">
+                  <label style="display:block; font-size:13.5px; font-weight:700; color:#334155; margin-bottom:6px;">Yeni Şifre Tekrar</label>
+                  <input type="password" id="sec_new_password_again" placeholder="Yeni şifrenizi tekrar yazın" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px; box-sizing:border-box; font-size:14px;" />
+              </div>
+
+              <button onclick="updateUserPassword()" id="btn_update_password" style="background: var(--primary, #0E7C86); color:white; border:none; border-radius:8px; padding:10px 18px; font-size:13px; font-weight:800; cursor:pointer; transition:background 0.15s;">
+                  Şifreyi Güncelle
+              </button>
           </div>
         </div>
 
@@ -349,21 +392,192 @@
       }
 
 
-      async function loadLeadCount() {
+      const EXPORT_CONFIGS = {
+        crm_leads: {
+          title: "🎯 Fırsat Müşterileri",
+          fields: "Firma Adı, Vergi No, Vergi Dairesi, Sektör, Nace Kodu, Tehlike Sınıfı, Çalışan Sayısı, İl, İlçe, Adres, Web Sitesi, Kaynak, Aşama, Durum, Notlar, Sorumlu, Tarih",
+          headers: ["Firma Adı","Vergi No","Vergi Dairesi","Sektör","Nace Kodu","Tehlike Sınıfı","Çalışan Sayısı","Şehir","İlçe","Adres","Web Sitesi","Kaynak","Aşama","Durum","Notlar","Sorumlu","Oluşturulma Tarihi"],
+          select: "company_name,tax_no,tax_office,sector,nace_code,danger_class,employee_count,city,district,address,website,lead_source,stage,lead_status,notes,assigned_to,created_at",
+          mapper: (l) => [
+            l.company_name||'', l.tax_no||'', l.tax_office||'', l.sector||'', l.nace_code||'', l.danger_class||'',
+            l.employee_count||'', l.city||'', l.district||'', l.address||'', l.website||'', l.lead_source||'',
+            l.stage||'', l.lead_status||'', l.notes||'', l.assigned_to||'', l.created_at||''
+          ]
+        },
+        crm_contacts: {
+          title: "👥 İletişim Kişileri",
+          fields: "Ad Soyad, Unvan, Telefon, E-posta, Birincil Yetkili, Fatura Yetkilisi, Sözleşme Yetkilisi, Notlar, Tarih",
+          headers: ["Ad Soyad","Unvan","Telefon","E-posta","Birincil Yetkili","Fatura Yetkilisi","Sözleşme Yetkilisi","Notlar","Oluşturulma Tarihi"],
+          select: "full_name,title,phone,email,is_primary,is_invoice_contact,is_contract_authority,notes,created_at",
+          mapper: (c) => [
+            c.full_name||'', c.title||'', c.phone||'', c.email||'',
+            c.is_primary ? 'Evet' : 'Hayır', c.is_invoice_contact ? 'Evet' : 'Hayır', c.is_contract_authority ? 'Evet' : 'Hayır',
+            c.notes||'', c.created_at||''
+          ]
+        },
+        crm_offers: {
+          title: "📝 Teklifler",
+          fields: "Teklif No, Versiyon, Teklif Tarihi, Geçerlilik Tarihi, Çalışan Sayısı, Aylık Ücret, İskonto (%), KDV Oranı (%), KDV Dahil Genel Toplam, Durum, Notlar, Tarih",
+          headers: ["Teklif No","Versiyon","Teklif Tarihi","Geçerlilik Tarihi","Çalışan Sayısı","Aylık Ücret","İskonto (%)","KDV Oranı (%)","Genel Toplam","Durum","Notlar","Oluşturulma Tarihi"],
+          select: "offer_no,version,offer_date,valid_until,employee_count,monthly_fee,discount,kdv_rate,total_amount,status,notes,created_at",
+          mapper: (o) => [
+            o.offer_no||'', o.version||'', o.offer_date||'', o.valid_until||'', o.employee_count||'', o.monthly_fee||'',
+            o.discount||'', o.kdv_rate||'', o.total_amount||'', o.status||'', o.notes||'', o.created_at||''
+          ]
+        },
+        crm_contracts: {
+          title: "📄 Sözleşmeler",
+          fields: "Sözleşme No, Versiyon, Başlangıç Tarihi, Bitiş Tarihi, Aylık Ücret, Ödeme Dönemi, Ödeme Şekli, İmzalandı mı, İSG-Katip yapıldı mı, Sorumlu Uzman, Sorumlu Hekim, Durum, Notlar, Tarih",
+          headers: ["Sözleşme No","Versiyon","Başlangıç Tarihi","Bitiş Tarihi","Aylık Ücret","Ödeme Dönemi","Ödeme Şekli","İmzalandı mı","İSG-Katip yapıldı mı","Sorumlu Uzman","Sorumlu Hekim","Durum","Notlar","Oluşturulma Tarihi"],
+          select: "contract_no,version,start_date,end_date,monthly_fee,payment_period,payment_method,is_signed,isg_katip_done,assigned_uzman,assigned_hekim,status,notes,created_at",
+          mapper: (c) => [
+            c.contract_no||'', c.version||'', c.start_date||'', c.end_date||'', c.monthly_fee||'', c.payment_period||'', c.payment_method||'',
+            c.is_signed ? 'Evet' : 'Hayır', c.isg_katip_done ? 'Evet' : 'Hayır', c.assigned_uzman||'', c.assigned_hekim||'', c.status||'', c.notes||'', c.created_at||''
+          ]
+        },
+        crm_activities: {
+          title: "💬 Görüşmeler & Aktiviteler",
+          fields: "Görüşme Tipi, Görüşme Tarihi, Özet / Açıklama, Sonraki Aksiyon, Oluşturan, Tarih",
+          headers: ["Görüşme Tipi","Görüşme Tarihi","Özet / Açıklama","Sonraki Aksiyon","Oluşturan","Oluşturulma Tarihi"],
+          select: "activity_type,activity_date,summary,next_action,created_by,created_at",
+          mapper: (a) => [
+            a.activity_type||'', a.activity_date||'', a.summary||'', a.next_action||'', a.created_by||'', a.created_at||''
+          ]
+        },
+        crm_tasks: {
+          title: "📋 Takip Görevleri",
+          fields: "Görev Başlığı, Sorumlu, Son Tarih, Öncelik, Durum, Aktivite Tipi, Notlar, Tamamlanma Tarihi, Oluşturan, Tarih",
+          headers: ["Görev Başlığı","Sorumlu","Son Tarih","Öncelik","Durum","Aktivite Tipi","Notlar","Tamamlanma Tarihi","Oluşturan","Oluşturulma Tarihi"],
+          select: "title,assigned_to,due_date,priority,status,activity_type,notes,completed_at,created_by,created_at",
+          mapper: (t) => [
+            t.title||'', t.assigned_to||'', t.due_date||'', t.priority||'', t.status||'', t.activity_type||'',
+            t.notes||'', t.completed_at||'', t.created_by||'', t.created_at||''
+          ]
+        },
+        osgb_staff: {
+          title: "🧑‍💼 Personel Listesi",
+          fields: "Ad Soyad, TC Kimlik No, E-posta, Yetki Rolü, Durum, Tarih",
+          headers: ["Ad Soyad","TC Kimlik No","E-posta","Yetki Rolü","Durum","Oluşturulma Tarihi"],
+          select: "full_name,tc_kimlik_no,email,access_role,status,created_at",
+          mapper: (s) => [
+            s.full_name||'', s.tc_kimlik_no||'', s.email||'', s.access_role||'', s.status||'', s.created_at||''
+          ]
+        },
+        crm_price_list: {
+          title: "💰 Fiyat Listesi",
+          fields: "Tehlike Sınıfı, Min. Çalışan Sayısı, Max. Çalışan Sayısı, Hizmet Adı, Birim Fiyat, Tarih",
+          headers: ["Tehlike Sınıfı","Min. Çalışan Sayısı","Max. Çalışan Sayısı","Hizmet Adı","Birim Fiyat","Oluşturulma Tarihi"],
+          select: "danger_class,min_emp,max_emp,service_name,price,created_at",
+          mapper: (p) => [
+            p.danger_class||'', p.min_emp||'', p.max_emp||'', p.service_name||'', p.price||'', p.created_at||''
+          ]
+        },
+        workers: {
+          title: "👷 Çalışan Listesi",
+          fields: "Çalışan Adı, Yaş, Cinsiyet, Görev / Unvan, Tarih",
+          headers: ["Çalışan Adı","Yaş","Cinsiyet","Görev / Unvan","Oluşturulma Tarihi"],
+          select: "full_name,age,gender,job_title,created_at",
+          mapper: (w) => [
+            w.full_name||'', w.age||'', w.gender||'', w.job_title||'', w.created_at||''
+          ]
+        },
+        training_attendance_entries: {
+          title: "📚 Eğitim Katılım Dersleri",
+          fields: "Eğitim Tipi, Ders Tarihi, Katılım Durumu, Katılınan Saat, Eğitmen, Notlar, Tarih",
+          headers: ["Eğitim Tipi","Ders Tarihi","Katılım Durumu","Katılınan Saat","Eğitmen","Notlar","Oluşturulma Tarihi"],
+          select: "training_type,session_date,attendance_status,attended_hours,trainer_name,notes,created_at",
+          mapper: (ae) => [
+            ae.training_type||'', ae.session_date||'', ae.attendance_status||'', ae.attended_hours||0, ae.trainer_name||'', ae.notes||'', ae.created_at||''
+          ]
+        },
+        training_completions: {
+          title: "🎓 Eğitim Tamamlama Durumları",
+          fields: "Çalışan Adı, Eğitim Tipi, Tehlike Sınıfı, Gerekli Saat, Tamamlanan Saat, Durum, Yenileme Tarihi, Tarih",
+          headers: ["Çalışan Adı","Eğitim Tipi","Tehlike Sınıfı","Gerekli Saat","Tamamlanan Saat","Durum","Yenileme Tarihi","Oluşturulma Tarihi"],
+          select: "worker_name,training_type,hazard_class,required_hours,completed_hours,completion_status,renewal_date,created_at",
+          mapper: (tc) => [
+            tc.worker_name||'', tc.training_type||'', tc.hazard_class||'', tc.required_hours||0, tc.completed_hours||0, tc.completion_status||'', tc.renewal_date||'', tc.created_at||''
+          ]
+        },
+        ppe_assignments: {
+          title: "🛡️ KKD Zimmetleri",
+          fields: "KKD Türü, Adet, Seri/Beden, Veriliş Tarihi, Yenileme Tarihi, Teslim Eden, Durum, Tarih",
+          headers: ["KKD Türü","Adet","Seri/Beden","Veriliş Tarihi","Yenileme Tarihi","Teslim Eden","Durum","Oluşturulma Tarihi"],
+          select: "ppe_type_name,quantity,serial_no,issue_date,renewal_date,issued_by_email,status,created_at",
+          mapper: (pa) => [
+            pa.ppe_type_name||'', pa.quantity||1, pa.serial_no||'', pa.issue_date||'', pa.renewal_date||'', pa.issued_by_email||'', pa.status||'', pa.created_at||''
+          ]
+        },
+        ppe_assignment_events: {
+          title: "🧾 KKD İşlem Olayları",
+          fields: "İşlem Tarihi, İşlem Tipi, Not, Oluşturan E-posta, Tarih",
+          headers: ["İşlem Tarihi","İşlem Tipi","Not","Oluşturan E-posta","Oluşturulma Tarihi"],
+          select: "event_date,event_type,note,created_by_email,created_at",
+          mapper: (pe) => [
+            pe.event_date||'', pe.event_type||'', pe.note||'', pe.created_by_email||'', pe.created_at||''
+          ]
+        },
+        work_accidents: {
+          title: "🚨 İş Kazaları",
+          fields: "Kaza Tarihi, Kaza Saati, Kaza Yeri, Kaza Tipi, Çalışan Adı, Önem Derecesi, SGK Son Bildirim, Bildirildi mi, Açıklama, Sorumlu, Tarih",
+          headers: ["Kaza Tarihi","Kaza Saati","Kaza Yeri","Kaza Tipi","Çalışan Adı","Önem Derecesi","SGK Son Bildirim","Bildirildi mi","Açıklama","Sorumlu","Oluşturulma Tarihi"],
+          select: "accident_date,accident_time,accident_location,accident_type,worker_name,severity,sgk_deadline,sgk_notified,description,responsible_person,created_at",
+          mapper: (wa) => [
+            wa.accident_date||'', wa.accident_time||'', wa.accident_location||'', wa.accident_type||'', wa.worker_name||'', wa.severity||'', wa.sgk_deadline||'', wa.sgk_notified ? 'Evet' : 'Hayır', wa.description||'', wa.responsible_person||'', wa.created_at||''
+          ]
+        },
+        near_miss_reports: {
+          title: "⚠️ Ramak Kala Raporları",
+          fields: "Tarih, Olay Yeri, Olay Açıklaması, Bildiren E-posta, Durum, Öncelik, Tarih",
+          headers: ["Tarih","Olay Yeri","Olay Açıklaması","Bildiren E-posta","Durum","Öncelik","Oluşturulma Tarihi"],
+          select: "report_date,location,description,reporter_email,status,priority,created_at",
+          mapper: (nm) => [
+            nm.report_date||'', nm.location||'', nm.description||'', nm.reporter_email||'', nm.status||'', nm.priority||'', nm.created_at||''
+          ]
+        },
+        risk_assessments: {
+          title: "📋 Risk Analizleri",
+          fields: "Tehlike, Risk, Olasılık, Şiddet, Risk Skoru, Durum, Kontrol Tedbirleri, Sorumlu, Son Tarih, Tarih",
+          headers: ["Tehlike","Risk","Olasılık","Şiddet","Risk Skoru","Durum","Kontrol Tedbirleri","Sorumlu","Son Tarih","Oluşturulma Tarihi"],
+          select: "hazard,risk,likelihood,severity,risk_score,status,control_measures,responsible,due_date,created_at",
+          mapper: (ra) => [
+            ra.hazard||'', ra.risk||'', ra.likelihood||'', ra.severity||'', ra.risk_score||'', ra.status||'', ra.control_measures||'', ra.responsible||'', ra.due_date||'', ra.created_at||''
+          ]
+        },
+        crm_price_list: {
+          title: "💰 Fiyat Listesi",
+          fields: "Tehlike Sınıfı, Min. Çalışan Sayısı, Max. Çalışan Sayısı, Hizmet Adı, Birim Fiyat, Tarih",
+          headers: ["Tehlike Sınıfı","Min. Çalışan Sayısı","Max. Çalışan Sayısı","Hizmet Adı","Birim Fiyat","Oluşturulma Tarihi"],
+          select: "danger_class,min_emp,max_emp,service_name,price,created_at",
+          mapper: (p) => [
+            p.danger_class||'', p.min_emp||'', p.max_emp||'', p.service_name||'', p.price||'', p.created_at||''
+          ]
+        }
+      };
+
+      async function onExportTableChange() {
+        const table = document.getElementById('export_table_select').value;
+        const config = EXPORT_CONFIGS[table];
+        if (!config) return;
+
+        document.getElementById('export_fields_desc').innerText = config.fields;
+        const badge = document.getElementById('export_count_badge');
+        badge.innerText = '⏳ Sayı hesaplanıyor...';
+
         if (!CURRENT_AUTH || !dbClient) return;
-        const { count } = await dbClient
-          .from('crm_leads')
-          .select('id', { count: 'exact', head: true })
-          .eq('tenant_id', CURRENT_AUTH.tenant_id);
-        allLeads = [];
-        const { data } = await dbClient
-          .from('crm_leads')
-          .select('company_name,city,district,sector,nace_code,danger_class,employee_count,stage,lead_status,lead_source,notes,created_at')
-          .eq('tenant_id', CURRENT_AUTH.tenant_id)
-          .order('created_at', { ascending: false });
-        allLeads = data || [];
-        const badge = document.getElementById('export_count_area');
-        badge.innerHTML = '<span class="export-count-badge">📊 ' + allLeads.length + ' müşteri kaydı mevcut</span>';
+
+        try {
+          const { count, error } = await dbClient
+            .from(table)
+            .select('*', { count: 'exact', head: true })
+            .eq('tenant_id', CURRENT_AUTH.tenant_id);
+
+          if (error) throw error;
+          badge.innerText = '📊 ' + (count || 0) + ' kayıt mevcut';
+        } catch (err) {
+          console.warn('Kayıt sayısı alınamadı:', err);
+          badge.innerText = '⚠️ Kayıt sayısı alınamadı';
+        }
       }
 
       window.downloadSampleCSV = function() {
@@ -378,34 +592,50 @@
         showToast("Örnek şablon indirildi.", "success");
       };
 
-      window.exportLeadsToCSV = function() {
-        if (allLeads.length === 0) {
-          showToast('Dışa aktarılacak kayıt bulunamadı.', 'error');
-          return;
+      window.exportSelectedTable = async function() {
+        const table = document.getElementById('export_table_select').value;
+        const config = EXPORT_CONFIGS[table];
+        if (!config || !CURRENT_AUTH || !dbClient) return;
+
+        const button = document.querySelector('.btn-transfer-export');
+        button.disabled = true;
+        button.innerText = '⏳ Hazırlanıyor...';
+
+        try {
+          const { data, error } = await dbClient
+            .from(table)
+            .select(config.select)
+            .eq('tenant_id', CURRENT_AUTH.tenant_id);
+
+          if (error) throw error;
+
+          if (!data || data.length === 0) {
+            showToast('Dışa aktarılacak kayıt bulunamadı.', 'error');
+            return;
+          }
+
+          const rows = data.map(item => {
+            const mapped = config.mapper(item);
+            return mapped.map(v => '"' + String(v).replace(/"/g, '""') + '"');
+          });
+
+          const csv = "\uFEFF" + [config.headers.join(";"), ...rows.map(r => r.join(";"))].join("\n");
+          const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${table}_ihracat_${new Date().toISOString().slice(0, 10)}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+
+          showToast(`${data.length} kayıt başarıyla dışa aktarıldı.`, "success");
+        } catch (err) {
+          showToast('Dışa aktarma hatası: ' + err.message, 'error');
+        } finally {
+          button.disabled = false;
+          button.innerHTML = `📤 Seçilen Tabloyu İndir (.csv)`;
         }
-        const headers = ["Firma Adı","Şehir","İlçe","Sektör","Nace Kodu","Tehlike Sınıfı","Çalışan Sayısı","Aşama","Durum","Kaynak","Notlar","Oluşturulma Tarihi"];
-        const rows = allLeads.map(l => [
-          '"' + (l.company_name||'').replace(/"/g,'""') + '"',
-          '"' + (l.city||'').replace(/"/g,'""') + '"',
-          '"' + (l.district||'').replace(/"/g,'""') + '"',
-          '"' + (l.sector||'').replace(/"/g,'""') + '"',
-          '"' + (l.nace_code||'').replace(/"/g,'""') + '"',
-          '"' + (l.danger_class||'').replace(/"/g,'""') + '"',
-          l.employee_count || '',
-          '"' + (l.stage||'').replace(/"/g,'""') + '"',
-          '"' + (l.lead_status||'').replace(/"/g,'""') + '"',
-          '"' + (l.lead_source||'').replace(/"/g,'""') + '"',
-          '"' + (l.notes||'').replace(/"/g,'""') + '"',
-          l.created_at || ''
-        ]);
-        const csv = "\uFEFF" + [headers.join(";"), ...rows.map(r => r.join(";"))].join("\n");
-        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "crm_lead_ihracat_" + new Date().toISOString().slice(0,10) + ".csv";
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        showToast(allLeads.length + " kayıt başarıyla dışa aktarıldı.", "success");
       };
 
       function parseCSVText(text) {
@@ -708,30 +938,23 @@
           });
         }
       });
-          document.addEventListener('DOMContentLoaded', async () => {
+      document.addEventListener('DOMContentLoaded', async () => {
         const auth = await requireAuthAndRole('crm');
         if (!auth) return;
         CURRENT_AUTH = auth;
-        await loadLeadCount();
+        await onExportTableChange();
       });
-
-      async function loadLeadCount() {
-        // Just refresh page or logic
-      }
       
       // -- AYARLAR SEKME & TEMA YÖNETİMİ --
       function switchSettingsTab(tabName, el) {
         document.querySelectorAll('#settings_tabs a').forEach(a => {
-            a.style.color = '#64748b';
-            a.style.fontWeight = '500';
-            a.style.borderBottom = 'none';
+            a.classList.remove('crm-sub-active');
         });
-        el.style.color = 'var(--transfer-indigo)';
-        el.style.fontWeight = '600';
-        el.style.borderBottom = '2px solid var(--transfer-indigo)';
+        el.classList.add('crm-sub-active');
 
         document.getElementById('tab_transfer').style.display = tabName === 'transfer' ? 'block' : 'none';
         document.getElementById('tab_theme').style.display = tabName === 'theme' ? 'block' : 'none';
+        document.getElementById('tab_security').style.display = tabName === 'security' ? 'block' : 'none';
       }
 
       function setThemePalette(palette) {
@@ -744,6 +967,42 @@
             localStorage.removeItem('isgnova_palette');
         }
         showToast('Tema rengi değiştirildi.', 'success');
+      }
+
+      async function updateUserPassword() {
+        const password = document.getElementById('sec_new_password').value;
+        const passwordAgain = document.getElementById('sec_new_password_again').value;
+
+        if (!password || !passwordAgain) {
+          showToast('Lütfen tüm alanları doldurun.', 'error');
+          return;
+        }
+        if (password.length < 6) {
+          showToast('Yeni şifre en az 6 karakter olmalıdır.', 'error');
+          return;
+        }
+        if (password !== passwordAgain) {
+          showToast('Yeni şifreler eşleşmiyor.', 'error');
+          return;
+        }
+
+        const button = document.getElementById('btn_update_password');
+        button.disabled = true;
+        button.innerText = 'Güncelleniyor...';
+
+        try {
+          const { error } = await dbClient.auth.updateUser({ password: password });
+          if (error) throw error;
+          
+          showToast('Şifreniz başarıyla güncellendi.', 'success');
+          document.getElementById('sec_new_password').value = '';
+          document.getElementById('sec_new_password_again').value = '';
+        } catch (err) {
+          showToast('Hata: ' + err.message, 'error');
+        } finally {
+          button.disabled = false;
+          button.innerText = 'Şifreyi Güncelle';
+        }
       }
 
     </script>
