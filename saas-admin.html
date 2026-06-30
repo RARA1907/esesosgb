@@ -2244,21 +2244,16 @@
             .single();
           if (sErr) throw sErr;
           const slug = staff.tenants && staff.tenants.slug ? staff.tenants.slug : '';
-          const resp = await fetch(`${SUPABASE_URL}/functions/v1/invite-staff-user`, {
+          const resp = await fetch('/api/send-invite', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
             body: JSON.stringify({
               staff_id: staffId,
-              site_origin: window.location.origin,
               redirect_to: tenantLoginUrl(slug)
             })
           });
           const result = await resp.json().catch(() => ({}));
           if (!resp.ok || result.ok === false) throw new Error(result.error || JSON.stringify(result));
-          await dbClient
-            .from('osgb_staff')
-            .update({ auth_invite_status: 'sent', auth_invited_at: new Date().toISOString() })
-            .eq('id', staffId);
           markOnboardingInviteSent({ tenantId: staff.tenant_id, adminEmail: staff.email || '' });
           setEditStatus('Davet gönderildi: ' + (result.email || staff.email), true);
           await loadTenants();
